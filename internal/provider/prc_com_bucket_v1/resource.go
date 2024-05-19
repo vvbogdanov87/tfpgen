@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-
-	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sSchema "k8s.io/apimachinery/pkg/runtime/schema"
+	k8sTypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/pointer"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -22,7 +22,7 @@ var (
 
 // bucketResource is the resource implementation.
 type bucketResource struct {
-	client *kubernetes.Clientset
+	client dynamic.Interface
 }
 
 // NewBucketResource is a helper function to simplify the provider implementation.
@@ -49,7 +49,6 @@ func (r *bucketResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 						Optional: false,
 						Computed: false,
 					},
-
 					"namespace": schema.StringAttribute{
 						Required: true,
 						Optional: false,
@@ -83,24 +82,11 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// Generate API request body from plan
-	manifest := &Buckets{
-		TypeMeta: v1.TypeMeta{
-			APIVersion: BucketsApi,
-			Kind:       "Bucket",
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name: plan.Metadata.Name.ValueString(),
-		},
-		Spec: BucketsSpec{
-			Prefix: plan.Spec.Prefix.ValueString(),
-		},
-	}
+	plan.ApiVersion = pointer.String("prc.com/v1")
+	plan.Kind = pointer.String("Bucket")
 
 	// Create new resource
-	path := fmt.Sprintf("/apis/%s/namespaces/%s/%s", BucketsApi, plan.Metadata.Namespace.ValueString(), "Buckets")
-	path = strings.ToLower(path)
-	body, err := json.Marshal(manifest)
+	body, err := json.Marshal(plan)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"marshal resource",
@@ -108,11 +94,21 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 		)
 		return
 	}
-	_, err = r.client.RESTClient().Post().AbsPath(path).Body(body).DoRaw(context.TODO())
+
+	patchOptions := meta.PatchOptions{
+		FieldManager:    "terraform-provider-crd",
+		Force:           pointer.Bool(true),
+		FieldValidation: "Strict",
+	}
+
+	_, err = r.client.
+		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
+		Namespace(plan.Metadata.Namespace).
+		Patch(ctx, plan.Metadata.Name, k8sTypes.ApplyPatchType, body, patchOptions)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Create resource",
-			fmt.Sprintf("Error creating resource \"%s\":\n%s\nBody:\n%s", path, err.Error(), string(body)),
+			fmt.Sprintf("Error creating resource: %s\nBody:\n%s", err.Error(), string(body)),
 		)
 		return
 	}
@@ -138,17 +134,28 @@ func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	// Get resource from Kubernetes
-	path := fmt.Sprintf("/apis/%s/namespaces/%s/%s/%s", BucketsApi, state.Metadata.Namespace.ValueString(), "Buckets", state.Metadata.Name.ValueString())
-	path = strings.ToLower(path)
-	body, err := r.client.RESTClient().Get().AbsPath(path).DoRaw(context.TODO())
+	getResponse, err := r.client.
+		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
+		Namespace(state.Metadata.Namespace).
+		Get(ctx, state.Metadata.Name, meta.GetOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Get resource",
-			fmt.Sprintf("Error getting resource from Kubernetes \"%s\":\n%s", path, err.Error()),
+			fmt.Sprintf("Error getting resource from Kubernetes: %s", err.Error()),
 		)
 		return
 	}
-	var manifest Buckets
+
+	body, err := getResponse.MarshalJSON()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"response marshal",
+			fmt.Sprintf("Error marshalling response: %s", err.Error()),
+		)
+		return
+	}
+
+	var manifest bucketResourceModel
 	err = json.Unmarshal(body, &manifest)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -159,7 +166,7 @@ func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	// Overwrite current state with refreshed state
-	state.Spec.Prefix = types.StringValue(manifest.Spec.Prefix)
+	state.Spec.Prefix = manifest.Spec.Prefix
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -171,6 +178,53 @@ func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	// Retrieve values from plan
+	var plan bucketResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	plan.ApiVersion = pointer.String("prc.com/v1")
+	plan.Kind = pointer.String("Bucket")
+
+	// Update resource
+	body, err := json.Marshal(plan)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"marshal resource",
+			fmt.Sprintf("Error marshaling CRD:\n%s", err.Error()),
+		)
+		return
+	}
+
+	patchOptions := meta.PatchOptions{
+		FieldManager:    "terraform-provider-crd",
+		Force:           pointer.Bool(true),
+		FieldValidation: "Strict",
+	}
+
+	_, err = r.client.
+		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
+		Namespace(plan.Metadata.Namespace).
+		Patch(ctx, plan.Metadata.Name, k8sTypes.ApplyPatchType, body, patchOptions)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Update resource",
+			fmt.Sprintf("Error updating resource: %s\nBody:\n%s", err.Error(), string(body)),
+		)
+		return
+	}
+
+	// TODO: populate computed values (status)
+
+	// Set state to fully populated data
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -183,7 +237,7 @@ func (r *bucketResource) Configure(_ context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	client, ok := req.ProviderData.(*kubernetes.Clientset)
+	client, ok := req.ProviderData.(dynamic.Interface)
 
 	if !ok {
 		resp.Diagnostics.AddError(

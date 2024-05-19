@@ -1,18 +1,15 @@
 package prc_com_bucket_v1
 
-import "github.com/hashicorp/terraform-plugin-framework/types"
-
-// bucketResourceModel maps the resource schema data.
 type bucketResourceModel struct {
-	Metadata metadataModel `tfsdk:"metadata"`
-	Spec     bucketSpec    `tfsdk:"spec"`
-}
+	ApiVersion *string `tfsdk:"-" json:"apiVersion"`
+	Kind       *string `tfsdk:"-" json:"kind"`
 
-type metadataModel struct {
-	Name      types.String `tfsdk:"name"`
-	Namespace types.String `tfsdk:"namespace"`
-}
+	Metadata struct {
+		Name      string `tfsdk:"name" json:"name"`
+		Namespace string `tfsdk:"namespace" json:"namespace"`
+	} `tfsdk:"metadata" json:"metadata"`
 
-type bucketSpec struct {
-	Prefix types.String `tfsdk:"prefix"`
+	Spec *struct {
+		Prefix *string `tfsdk:"prefix" json:"prefix,omitempty"`
+	} `tfsdk:"spec" json:"spec,omitempty"`
 }

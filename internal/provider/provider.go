@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/vvbogdanov87/terraform-provider-crd/internal/provider/prc_com_bucket_v1"
 
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
@@ -63,7 +63,7 @@ func (p *crdProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		return
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := dynamic.NewForConfig(config)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"create kuberentes client",
