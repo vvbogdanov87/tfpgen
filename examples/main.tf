@@ -6,12 +6,13 @@ terraform {
   }
 }
 
-provider "crd" {}
+provider "crd" {
+  namespace = "test"
+}
 
 resource "crd_bucket" "example" {
   metadata = {
     name      = "testbckt"
-    namespace = "test"
   }
 
   spec = {

@@ -6,7 +6,7 @@ type bucketResourceModel struct {
 
 	Metadata struct {
 		Name      string `tfsdk:"name" json:"name"`
-		Namespace string `tfsdk:"namespace" json:"namespace"`
+		Namespace string `tfsdk:"-" json:"namespace"`
 	} `tfsdk:"metadata" json:"metadata"`
 
 	Spec *struct {

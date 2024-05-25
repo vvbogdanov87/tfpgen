@@ -7,6 +7,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/vvbogdanov87/terraform-provider-crd/internal/provider/common"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
@@ -22,7 +25,8 @@ var (
 
 // bucketResource is the resource implementation.
 type bucketResource struct {
-	client dynamic.Interface
+	client    dynamic.Interface
+	namespace string
 }
 
 // NewBucketResource is a helper function to simplify the provider implementation.
@@ -48,11 +52,9 @@ func (r *bucketResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 						Required: true,
 						Optional: false,
 						Computed: false,
-					},
-					"namespace": schema.StringAttribute{
-						Required: true,
-						Optional: false,
-						Computed: false,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 				},
 			},
@@ -84,6 +86,7 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	plan.ApiVersion = pointer.String("prc.com/v1")
 	plan.Kind = pointer.String("Bucket")
+	plan.Metadata.Namespace = r.namespace
 
 	// Create new resource
 	body, err := json.Marshal(plan)
@@ -136,7 +139,7 @@ func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// Get resource from Kubernetes
 	getResponse, err := r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
-		Namespace(state.Metadata.Namespace).
+		Namespace(r.namespace).
 		Get(ctx, state.Metadata.Name, meta.GetOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -188,6 +191,7 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	plan.ApiVersion = pointer.String("prc.com/v1")
 	plan.Kind = pointer.String("Bucket")
+	plan.Metadata.Namespace = r.namespace
 
 	// Update resource
 	body, err := json.Marshal(plan)
@@ -229,6 +233,31 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	// Get current state
+	var state bucketResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Delete resource
+	fg := meta.DeletePropagationForeground
+	deleteOptions := meta.DeleteOptions{
+		PropagationPolicy: &fg,
+	}
+
+	err := r.client.
+		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
+		Namespace(r.namespace).
+		Delete(ctx, state.Metadata.Name, deleteOptions)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Delete resource",
+			fmt.Sprintf("Error deleting resource: %s", err.Error()),
+		)
+		return
+	}
 }
 
 // Configure adds the provider configured client to the resource.
@@ -237,8 +266,7 @@ func (r *bucketResource) Configure(_ context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	client, ok := req.ProviderData.(dynamic.Interface)
-
+	pd, ok := req.ProviderData.(common.ResourceData)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
@@ -248,5 +276,6 @@ func (r *bucketResource) Configure(_ context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	r.client = client
+	r.client = pd.Clientset
+	r.namespace = pd.Namespace
 }
