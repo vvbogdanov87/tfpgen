@@ -4,16 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
+
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/vvbogdanov87/terraform-provider-crd/internal/provider/common"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	k8sSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
+
 	"k8s.io/client-go/dynamic"
+
 	"k8s.io/utils/pointer"
 )
 
@@ -40,36 +48,30 @@ func (r *bucketResource) Metadata(_ context.Context, req resource.MetadataReques
 }
 
 // Schema defines the schema for the resource.
-func (r *bucketResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *bucketResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"metadata": schema.SingleNestedAttribute{
+			"name": schema.StringAttribute{
 				Required: true,
 				Optional: false,
 				Computed: false,
-				Attributes: map[string]schema.Attribute{
-					"name": schema.StringAttribute{
-						Required: true,
-						Optional: false,
-						Computed: false,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"spec": schema.SingleNestedAttribute{
-				Required: false,
-				Optional: true,
+			"prefix": schema.StringAttribute{
+				Required: true,
+				Optional: false,
 				Computed: false,
-				Attributes: map[string]schema.Attribute{
-					"prefix": schema.StringAttribute{
-						Required: true,
-						Optional: false,
-						Computed: false,
-					},
-				},
 			},
+			"arn": schema.StringAttribute{
+
+				Computed: true,
+			},
+			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
+				Create: true,
+				Update: true,
+			}),
 		},
 	}
 }
@@ -81,15 +83,23 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		resp.Diagnostics.AddError(
+			"Get state in create", "Error getting state in create",
+		)
 		return
 	}
 
-	plan.ApiVersion = pointer.String("prc.com/v1")
-	plan.Kind = pointer.String("Bucket")
-	plan.Metadata.Namespace = r.namespace
+	// Get timeout
+	createTimeout, diags := plan.Timeouts.Create(ctx, 5*time.Minute)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	cr := r.modelToCR(&plan)
 
 	// Create new resource
-	body, err := json.Marshal(plan)
+	body, err := json.Marshal(cr)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"marshal resource",
@@ -98,7 +108,7 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	patchOptions := meta.PatchOptions{
+	patchOptions := metav1.PatchOptions{
 		FieldManager:    "terraform-provider-crd",
 		Force:           pointer.Bool(true),
 		FieldValidation: "Strict",
@@ -106,8 +116,8 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	_, err = r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
-		Namespace(plan.Metadata.Namespace).
-		Patch(ctx, plan.Metadata.Name, k8sTypes.ApplyPatchType, body, patchOptions)
+		Namespace(cr.Namespace).
+		Patch(ctx, cr.Name, k8sTypes.ApplyPatchType, body, patchOptions)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Create resource",
@@ -116,7 +126,18 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// TODO: populate computed values (status)
+	// wait for resource becomes READY
+	cr, err = r.waitReady(ctx, plan.Name.ValueString(), createTimeout)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Waiting resource READY",
+			fmt.Sprintf("Error waiting for resource READY state: %s", err.Error()),
+		)
+		return
+	}
+
+	// Set computed values
+	plan.Arn = types.StringValue(*cr.Status.Arn)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -133,43 +154,24 @@ func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, res
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		resp.Diagnostics.AddError(
+			"Get state in read", "Error getting state in read",
+		)
 		return
 	}
 
 	// Get resource from Kubernetes
-	getResponse, err := r.client.
-		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
-		Namespace(r.namespace).
-		Get(ctx, state.Metadata.Name, meta.GetOptions{})
+	cr, err := r.getResource(ctx, state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Get resource",
-			fmt.Sprintf("Error getting resource from Kubernetes: %s", err.Error()),
-		)
-		return
-	}
-
-	body, err := getResponse.MarshalJSON()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"response marshal",
-			fmt.Sprintf("Error marshalling response: %s", err.Error()),
-		)
-		return
-	}
-
-	var manifest bucketResourceModel
-	err = json.Unmarshal(body, &manifest)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Unmarshal resource",
-			fmt.Sprintf("Error unmarshaling CRD:\n%s", err.Error()),
+			fmt.Sprintf("Error getting resource:\n%s", err.Error()),
 		)
 		return
 	}
 
 	// Overwrite current state with refreshed state
-	state.Spec.Prefix = manifest.Spec.Prefix
+	state.Prefix = types.StringValue(cr.Spec.Prefix)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -189,12 +191,17 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	plan.ApiVersion = pointer.String("prc.com/v1")
-	plan.Kind = pointer.String("Bucket")
-	plan.Metadata.Namespace = r.namespace
+	// Get timeout
+	updateTimeout, diags := plan.Timeouts.Update(ctx, 5*time.Minute)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	cr := r.modelToCR(&plan)
 
 	// Update resource
-	body, err := json.Marshal(plan)
+	body, err := json.Marshal(cr)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"marshal resource",
@@ -203,7 +210,7 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	patchOptions := meta.PatchOptions{
+	patchOptions := metav1.PatchOptions{
 		FieldManager:    "terraform-provider-crd",
 		Force:           pointer.Bool(true),
 		FieldValidation: "Strict",
@@ -211,8 +218,8 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	_, err = r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
-		Namespace(plan.Metadata.Namespace).
-		Patch(ctx, plan.Metadata.Name, k8sTypes.ApplyPatchType, body, patchOptions)
+		Namespace(cr.Namespace).
+		Patch(ctx, cr.Name, k8sTypes.ApplyPatchType, body, patchOptions)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Update resource",
@@ -221,7 +228,24 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// TODO: populate computed values (status)
+	// wait for resource becomes READY
+	cr, err = r.waitReady(ctx, plan.Name.ValueString(), updateTimeout)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Waiting resource READY",
+			fmt.Sprintf("Error waiting for resource READY state: %s", err.Error()),
+		)
+		return
+	}
+	if cr == nil {
+		resp.Diagnostics.AddError(
+			"Get ARN",
+			fmt.Sprintf("name: %s, timeout: %s", plan.Name.ValueString(), updateTimeout.String()),
+		)
+		return
+	}
+	// Set computed values
+	plan.Arn = types.StringValue(*cr.Status.Arn)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -242,15 +266,15 @@ func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	}
 
 	// Delete resource
-	fg := meta.DeletePropagationForeground
-	deleteOptions := meta.DeleteOptions{
+	fg := metav1.DeletePropagationForeground
+	deleteOptions := metav1.DeleteOptions{
 		PropagationPolicy: &fg,
 	}
 
 	err := r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
 		Namespace(r.namespace).
-		Delete(ctx, state.Metadata.Name, deleteOptions)
+		Delete(ctx, state.Name.ValueString(), deleteOptions)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Delete resource",
@@ -278,4 +302,66 @@ func (r *bucketResource) Configure(_ context.Context, req resource.ConfigureRequ
 
 	r.client = pd.Clientset
 	r.namespace = pd.Namespace
+}
+
+func (r *bucketResource) getResource(ctx context.Context, name string) (*K8sCR, error) {
+	getResponse, err := r.client.
+		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
+		Namespace(r.namespace).
+		Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := getResponse.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest K8sCR
+	err = json.Unmarshal(body, &manifest)
+	if err != nil {
+		return nil, err
+	}
+
+	return &manifest, nil
+}
+
+func (r *bucketResource) modelToCR(model *bucketResourceModel) *K8sCR {
+	return &K8sCR{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: k8sApiVersion,
+			Kind:       "Bucket",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      model.Name.ValueString(),
+			Namespace: r.namespace,
+		},
+		Spec: K8sSpec{
+			Prefix: model.Prefix.ValueString(),
+		},
+	}
+}
+
+func (r *bucketResource) waitReady(ctx context.Context, name string, timeout time.Duration) (*K8sCR, error) {
+	var cr *K8sCR
+	err := retry.RetryContext(ctx, timeout, func() *retry.RetryError {
+		var err error
+		cr, err = r.getResource(ctx, name)
+		if err != nil {
+			return retry.RetryableError(fmt.Errorf("getting resource: %w", err))
+		}
+
+		if cr.Status.Conditions == nil {
+			return retry.RetryableError(fmt.Errorf("resource doesn't have 'conditions' field"))
+		}
+
+		for _, condition := range *cr.Status.Conditions {
+			if *condition.Type == "Ready" && *condition.Status == "True" {
+				return nil
+			}
+		}
+		return retry.RetryableError(fmt.Errorf("resource is not READY"))
+	})
+	return cr, err
 }

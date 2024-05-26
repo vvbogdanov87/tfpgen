@@ -11,11 +11,10 @@ provider "crd" {
 }
 
 resource "crd_bucket" "example" {
-  metadata = {
-    name      = "testbckt"
-  }
+  name = "testbckt"
+  prefix = "abc"
+}
 
-  spec = {
-    prefix = "abc"
-  }
+output "arn" {
+  value = crd_bucket.example.arn
 }
