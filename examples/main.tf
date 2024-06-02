@@ -13,6 +13,9 @@ provider "crd" {
 resource "crd_bucket" "example" {
   name = "testbckt"
   prefix = "abc"
+  tags = {
+    key1 = "value1"
+  }
 }
 
 output "arn" {

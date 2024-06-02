@@ -6,8 +6,10 @@ import (
 )
 
 type bucketResourceModel struct {
-	Name     types.String   `tfsdk:"name"`
-	Prefix   types.String   `tfsdk:"prefix"`
-	Arn      types.String   `tfsdk:"arn"`
-	Timeouts timeouts.Value `tfsdk:"timeouts"`
+	Name            types.String   `tfsdk:"name"`
+	Prefix          types.String   `tfsdk:"prefix"`
+	Tags            types.Map      `tfsdk:"tags"`
+	Arn             types.String   `tfsdk:"arn"`
+	Timeouts        timeouts.Value `tfsdk:"timeouts"`
+	ResourceVersion types.String   `tfsdk:"resource_version"`
 }
