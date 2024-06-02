@@ -1,0 +1,41 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xbuckets.prc.com
+spec:
+  group: prc.com
+  names:
+    kind: XBucket
+    plural: xbuckets
+  claimNames:
+    kind: Bucket
+    plural: buckets
+  defaultCompositeDeletePolicy: Foreground
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              prefix:
+                type: string
+                x-kubernetes-validations:
+                - rule: self == oldSelf
+                  message: Value is immutable
+              tags:
+                type: object
+                additionalProperties:
+                  type: string
+                x-kubernetes-map-type: atomic
+            required:
+              - prefix
+          status:
+            type: object
+            properties:
+              arn:
+                type: string

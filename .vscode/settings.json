@@ -1,7 +1,8 @@
 {
     "yaml.schemas": {
         "Kubernetes": [
-            "/schemas/*.yaml"
+            "/schemas/*.yaml",
+            "/examples/crossplane/**/*.yaml"
         ]
     }
 }

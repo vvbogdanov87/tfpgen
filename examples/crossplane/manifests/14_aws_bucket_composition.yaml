@@ -1,0 +1,35 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: buckets
+spec:
+  compositeTypeRef:
+    apiVersion: prc.com/v1
+    kind: XBucket
+  resources:
+    - name: bucket
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: Bucket
+        metadata:
+          name: bucket
+        spec:
+          forProvider:
+            region: us-west-2
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.prefix
+          toFieldPath: metadata.annotations["crossplane.io/external-name"]
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-prc-bucket"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.tags
+          toFieldPath: spec.forProvider.tags
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.arn
+          toFieldPath: status.arn
