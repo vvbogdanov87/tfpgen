@@ -2,6 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug Generator",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/tools/generator",
+        },
+        {
             "name": "Debug Terraform Provider",
             "type": "go",
             "request": "launch",
