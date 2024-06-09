@@ -19,15 +19,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	tmplName := "crd.tmpl"
-	tmplFilePath := filepath.Join(cwd, "templates", tmplName)
-
-	tmpl, err := template.New(tmplName).ParseFiles(tmplFilePath)
+	crdTmpl, err := getTemplate("crd.go.tmpl", cwd)
 	if err != nil {
-		logger.Error("parse template: ", err)
+		logger.Error("get crd template: ", err)
+		os.Exit(1)
+	}
+	modelTmpl, err := getTemplate("model.go.tmpl", cwd)
+	if err != nil {
+		logger.Error("get model template: ", err)
 		os.Exit(1)
 	}
 
+	// generate code for each schema from each template
 	schemasDir := filepath.Join(cwd, "../../schemas")
 	err = filepath.WalkDir(schemasDir, func(schemaPath string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -45,16 +48,14 @@ func main() {
 			return fmt.Errorf("parse schema: %w", err)
 		}
 
-		outFilePath := filepath.Join(cwd, "../../out", data.FileName)
-
-		err = generateCode(outFilePath, tmpl, data)
+		err = generateCode(crdTmpl, "crd.go", cwd, data)
 		if err != nil {
-			return fmt.Errorf("generate code: %w", err)
+			return fmt.Errorf("generate CRD code: %w", err)
 		}
 
-		err = formatCode(outFilePath)
+		err = generateCode(modelTmpl, "model.go", cwd, data)
 		if err != nil {
-			return fmt.Errorf("format code: %w", err)
+			return fmt.Errorf("generate Terraform Resource Model code: %w", err)
 		}
 
 		return nil
@@ -63,9 +64,31 @@ func main() {
 		logger.Error("generating CRD types", err)
 		os.Exit(1)
 	}
+
 }
 
-func generateCode(filePath string, tmpl *template.Template, data Data) error {
+func getTemplate(tmplName string, cwd string) (*template.Template, error) {
+	tmplFilePath := filepath.Join(cwd, "templates", tmplName)
+	return template.New(tmplName).ParseFiles(tmplFilePath)
+}
+
+func generateCode(tmpl *template.Template, outFileName string, cwd string, data Data) error {
+	outFilePath := filepath.Join(cwd, "../../out", outFileName)
+
+	err := executeTemplate(outFilePath, tmpl, data)
+	if err != nil {
+		return fmt.Errorf("generate code: %w", err)
+	}
+
+	err = formatCode(outFilePath)
+	if err != nil {
+		return fmt.Errorf("format code: %w", err)
+	}
+
+	return nil
+}
+
+func executeTemplate(filePath string, tmpl *template.Template, data Data) error {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("create output file: %w", err)

@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const k8sApiVersion = "{{ .ApiVersion }}"
+const k8sApiVersion = "{{ .CrdApiVersion }}"
 
 type K8sCR struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -15,12 +15,12 @@ type K8sCR struct {
 }
 
 type K8sSpec struct {
-    {{- range .SpecFields }}
+    {{- range .CrdSpecFields }}
     {{ .Name }} {{ .Type }} `json:"{{ .JsonName }}"`{{ end }}
 }
 
 type K8sStatus struct {
-    {{- range .StatusFields }}
+    {{- range .CrdStatusFields }}
     {{ .Name }} {{ .Type }} `json:"{{ .JsonName }}"`{{ end }}
     
     Conditions *[]struct {
