@@ -1,69 +1,119 @@
 package main
 
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apimachinery/pkg/util/yaml"
+)
+
 type Data struct {
-	PackageName string
-	// CRD fileds
-	CrdApiVersion   string
-	CrdSpecFields   []CrdField
-	CrdStatusFields []CrdField
-	// Terraform Resource Model fields
-	RmTypeName string
-	RmFields   []rmField
+	PackageName      string
+	CrdApiVersion    string
+	RmTypeName       string
+	SpecProperties   []*Property
+	StatusProperties []*Property
 }
 
-type CrdField struct {
-	Name     string
-	Type     string
-	JsonName string
+type Property struct {
+	FieldName      string
+	AnnotationName string
+	Type           string
+	TFType         string
+	Properties     []*Property
 }
 
-type rmField struct {
-	Name      string
-	Type      string
-	TfsdkName string
+func parseSchema(file string) (*Data, error) {
+	crd, err := loadSchema(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load schema: %w", err)
+	}
+
+	return crdToData(crd), nil
 }
 
-func parseSchema(file string) (Data, error) {
-	// TODO: implement schema parsing
-	return Data{
-		PackageName:   "prc_com_bucket_v1",
-		CrdApiVersion: "prc.com/v1",
-		CrdSpecFields: []CrdField{
-			{
-				Name:     "Prefix",
-				Type:     "string",
-				JsonName: "prefix",
-			},
-			{
-				Name:     "Tags",
-				Type:     "map[string]string",
-				JsonName: "tags",
-			},
-		},
-		CrdStatusFields: []CrdField{
-			{
-				Name:     "Arn",
-				Type:     "*string",
-				JsonName: "arn",
-			},
-		},
-		RmTypeName: "bucketResourceModel",
-		RmFields: []rmField{
-			{
-				Name:      "Prefix",
-				Type:      "types.String",
-				TfsdkName: "prefix",
-			},
-			{
-				Name:      "Tags",
-				Type:      "types.Map",
-				TfsdkName: "tags",
-			},
-			{
-				Name:      "Arn",
-				Type:      "types.String",
-				TfsdkName: "arn",
-			},
-		},
-	}, nil
+func loadSchema(file string) (*apiextensions.CustomResourceDefinition, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file %s: %w", file, err)
+	}
+	defer f.Close()
+
+	bufr := bufio.NewReader(f)
+	yamlReader := yaml.NewYAMLReader(bufr)
+	data, err := yamlReader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read yaml from file %s: %w", file, err)
+	}
+
+	crd := &apiextensions.CustomResourceDefinition{}
+	if err := yaml.Unmarshal(data, crd); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal yaml from file %s: %w", file, err)
+	}
+
+	return crd, nil
+}
+
+func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
+	group := crd.Spec.Group
+	kind := crd.Spec.Names.Kind
+
+	// We assume that there is only one version
+	version := crd.Spec.Versions[0]
+
+	schema := version.Schema.OpenAPIV3Schema
+
+	spec := schema.Properties["spec"]
+	crossplaneSpecFields := [...]string{
+		"compositeDeletePolicy",
+		"compositionRef",
+		"compositionRevisionRef",
+		"compositionRevisionSelector",
+		"compositionSelector",
+		"compositionUpdatePolicy",
+		"publishConnectionDetailsTo",
+		"resourceRef",
+		"writeConnectionSecretToRef",
+	}
+	for _, field := range crossplaneSpecFields {
+		delete(spec.Properties, field)
+	}
+
+	status := schema.Properties["status"]
+	crossplaneStatusFields := [...]string{
+		"connectionDetails",
+	}
+	for _, field := range crossplaneStatusFields {
+		delete(status.Properties, field)
+	}
+
+	return &Data{
+		PackageName:      group + "_" + kind + "_" + version.Name,
+		CrdApiVersion:    group + "/" + version.Name,
+		RmTypeName:       strings.ToLower(kind) + "ResourceModel",
+		SpecProperties:   crdProperties(spec),
+		StatusProperties: crdProperties(status),
+	}
+}
+
+func crdProperties(schema apiextensions.JSONSchemaProps) []*Property {
+	properties := make([]*Property, 0, len(schema.Properties))
+	for name, sProp := range schema.Properties {
+		prop := &Property{
+			FieldName:      cases.Title(language.English, cases.NoLower).String(name),
+			AnnotationName: name,
+			Type:           sProp.Type,
+			TFType:         "types." + sProp.Type,
+			Properties:     crdProperties(sProp),
+		}
+
+		properties = append(properties, prop)
+	}
+
+	return properties
 }

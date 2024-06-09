@@ -72,7 +72,7 @@ func getTemplate(tmplName string, cwd string) (*template.Template, error) {
 	return template.New(tmplName).ParseFiles(tmplFilePath)
 }
 
-func generateCode(tmpl *template.Template, outFileName string, cwd string, data Data) error {
+func generateCode(tmpl *template.Template, outFileName string, cwd string, data *Data) error {
 	outFilePath := filepath.Join(cwd, "../../out", outFileName)
 
 	err := executeTemplate(outFilePath, tmpl, data)
@@ -88,7 +88,7 @@ func generateCode(tmpl *template.Template, outFileName string, cwd string, data 
 	return nil
 }
 
-func executeTemplate(filePath string, tmpl *template.Template, data Data) error {
+func executeTemplate(filePath string, tmpl *template.Template, data *Data) error {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("create output file: %w", err)
