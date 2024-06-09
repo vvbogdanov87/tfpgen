@@ -14,7 +14,7 @@ type Field struct {
 	JsonName string
 }
 
-func parseSchema(file string) Data {
+func parseSchema(file string) (Data, error) {
 	// TODO: implement schema parsing
 	return Data{
 		PackageName: "prc_com_bucket_v1",
@@ -39,5 +39,5 @@ func parseSchema(file string) Data {
 				JsonName: "arn",
 			},
 		},
-	}
+	}, nil
 }

@@ -29,7 +29,7 @@ func main() {
 	}
 
 	schemasDir := filepath.Join(cwd, "../../schemas")
-	err = filepath.WalkDir(schemasDir, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(schemasDir, func(schemaPath string, d os.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("walk schemas directory: %w", err)
 		}
@@ -38,34 +38,23 @@ func main() {
 			return nil
 		}
 
-		logger.Info("parsing schema", "path", path)
-		data := parseSchema(path)
+		logger.Info("generating code for schema", "path", schemaPath)
 
-		// generate code
+		data, err := parseSchema(schemaPath)
+		if err != nil {
+			return fmt.Errorf("parse schema: %w", err)
+		}
+
 		outFilePath := filepath.Join(cwd, "../../out", data.FileName)
-		outFile, err := os.Create(outFilePath)
+
+		err = generateCode(outFilePath, tmpl, data)
 		if err != nil {
-			logger.Error("create output file: ", err)
+			return fmt.Errorf("generate code: %w", err)
 		}
 
-		err = tmpl.Execute(outFile, data)
+		err = formatCode(outFilePath)
 		if err != nil {
-			logger.Error("execute template: ", err)
-			os.Exit(1)
-		}
-
-		//format code
-		unformatted, err := os.ReadFile(outFilePath)
-		if err != nil {
-			return fmt.Errorf("read unformatted file %s: %w", outFilePath, err)
-		}
-		formatted, err := format.Source(unformatted)
-		if err != nil {
-			return fmt.Errorf("format source %s: %w", outFilePath, err)
-		}
-		err = os.WriteFile(outFilePath, formatted, 0644)
-		if err != nil {
-			return fmt.Errorf("write formatted file %s: %w", outFilePath, err)
+			return fmt.Errorf("format code: %w", err)
 		}
 
 		return nil
@@ -74,5 +63,37 @@ func main() {
 		logger.Error("generating CRD types", err)
 		os.Exit(1)
 	}
+}
 
+func generateCode(filePath string, tmpl *template.Template, data Data) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("create output file: %w", err)
+	}
+
+	err = tmpl.Execute(file, data)
+	if err != nil {
+		return fmt.Errorf("execute template: %w", err)
+	}
+
+	return nil
+}
+
+func formatCode(filePath string) error {
+	unformatted, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read unformatted file %s: %w", filePath, err)
+	}
+
+	formatted, err := format.Source(unformatted)
+	if err != nil {
+		return fmt.Errorf("format source %s: %w", filePath, err)
+	}
+
+	err = os.WriteFile(filePath, formatted, 0644)
+	if err != nil {
+		return fmt.Errorf("write formatted file %s: %w", filePath, err)
+	}
+
+	return nil
 }
