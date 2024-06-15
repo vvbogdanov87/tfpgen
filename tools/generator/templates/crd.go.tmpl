@@ -15,13 +15,13 @@ type K8sCR struct {
 }
 
 type K8sSpec struct {
-    {{- range .CrdSpecFields }}
-    {{ .Name }} {{ .Type }} `json:"{{ .JsonName }}"`{{ end }}
+    {{- range .SpecProperties }}
+    {{ .FieldName }} {{ .Type }} `json:"{{ .AnnotationName }}"`{{ end }}
 }
 
 type K8sStatus struct {
-    {{- range .CrdStatusFields }}
-    {{ .Name }} {{ .Type }} `json:"{{ .JsonName }}"`{{ end }}
+    {{- range .StatusProperties }}
+    {{ .FieldName }} {{ .Type }} `json:"{{ .AnnotationName }}"`{{ end }}
     
     Conditions *[]struct {
 		Type   *string `json:"type"`

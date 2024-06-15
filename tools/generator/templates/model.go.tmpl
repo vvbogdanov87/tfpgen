@@ -10,6 +10,9 @@ type {{ .RmTypeName }} struct {
 	Timeouts        timeouts.Value `tfsdk:"timeouts"`
 	ResourceVersion types.String   `tfsdk:"resource_version"`
 
-	{{- range .RmFields }}
-	{{ .Name }} {{ .Type }} `tfsdk:"{{ .TfsdkName }}"`{{ end }}
+	{{- range .SpecProperties }}
+	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .AnnotationName }}"`{{ end }}
+
+	{{- range .StatusProperties }}
+	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .AnnotationName }}"`{{ end }}
 }

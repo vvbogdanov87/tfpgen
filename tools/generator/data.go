@@ -28,6 +28,8 @@ type Property struct {
 	Properties     []*Property
 }
 
+var capitalizer = cases.Title(language.English, cases.NoLower)
+
 func parseSchema(file string) (*Data, error) {
 	crd, err := loadSchema(file)
 	if err != nil {
@@ -61,13 +63,14 @@ func loadSchema(file string) (*apiextensions.CustomResourceDefinition, error) {
 
 func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 	group := crd.Spec.Group
-	kind := crd.Spec.Names.Kind
+	kind := strings.ToLower(crd.Spec.Names.Kind)
 
 	// We assume that there is only one version
 	version := crd.Spec.Versions[0]
 
 	schema := version.Schema.OpenAPIV3Schema
 
+	// Delete crossplane specific spec fields
 	spec := schema.Properties["spec"]
 	crossplaneSpecFields := [...]string{
 		"compositeDeletePolicy",
@@ -84,16 +87,18 @@ func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 		delete(spec.Properties, field)
 	}
 
+	// Delete crossplane specific status fields
 	status := schema.Properties["status"]
 	crossplaneStatusFields := [...]string{
 		"connectionDetails",
+		"conditions",
 	}
 	for _, field := range crossplaneStatusFields {
 		delete(status.Properties, field)
 	}
 
 	return &Data{
-		PackageName:      group + "_" + kind + "_" + version.Name,
+		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + kind + "_" + strings.ToLower(version.Name),
 		CrdApiVersion:    group + "/" + version.Name,
 		RmTypeName:       strings.ToLower(kind) + "ResourceModel",
 		SpecProperties:   crdProperties(spec),
@@ -105,10 +110,10 @@ func crdProperties(schema apiextensions.JSONSchemaProps) []*Property {
 	properties := make([]*Property, 0, len(schema.Properties))
 	for name, sProp := range schema.Properties {
 		prop := &Property{
-			FieldName:      cases.Title(language.English, cases.NoLower).String(name),
+			FieldName:      capitalizer.String(name),
 			AnnotationName: name,
 			Type:           sProp.Type,
-			TFType:         "types." + sProp.Type,
+			TFType:         "types." + capitalizer.String(sProp.Type),
 			Properties:     crdProperties(sProp),
 		}
 
