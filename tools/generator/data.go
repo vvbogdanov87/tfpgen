@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"golang.org/x/text/cases"
@@ -26,6 +27,7 @@ type Property struct {
 	Type           string
 	TFType         string
 	Properties     []*Property
+	Required       bool
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -101,23 +103,42 @@ func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + kind + "_" + strings.ToLower(version.Name),
 		CrdApiVersion:    group + "/" + version.Name,
 		RmTypeName:       strings.ToLower(kind) + "ResourceModel",
-		SpecProperties:   crdProperties(spec),
-		StatusProperties: crdProperties(status),
+		SpecProperties:   crdProperties(spec, false),
+		StatusProperties: crdProperties(status, true),
 	}
 }
 
-func crdProperties(schema apiextensions.JSONSchemaProps) []*Property {
+func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Property {
 	properties := make([]*Property, 0, len(schema.Properties))
+	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
+		typeName := sProp.Type
+		tfTypeName := "types." + capitalizer.String(sProp.Type)
+		if typeName == "object" {
+			typeName = "map[string]string"
+			tfTypeName = "types.Map"
+		}
+
+		if computed {
+			typeName = "*" + typeName
+		}
+
 		prop := &Property{
 			FieldName:      capitalizer.String(name),
 			AnnotationName: name,
-			Type:           sProp.Type,
-			TFType:         "types." + capitalizer.String(sProp.Type),
-			Properties:     crdProperties(sProp),
+			Type:           typeName,
+			TFType:         tfTypeName,
+			Properties:     crdProperties(sProp, computed),
 		}
 
 		properties = append(properties, prop)
+	}
+
+	// Mark required properties
+	for _, prop := range properties {
+		if slices.Contains(schema.Required, prop.AnnotationName) {
+			prop.Required = true
+		}
 	}
 
 	return properties
