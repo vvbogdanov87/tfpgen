@@ -25,35 +25,36 @@ import (
 
 	"k8s.io/client-go/dynamic"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource              = &bucketResource{}
-	_ resource.ResourceWithConfigure = &bucketResource{}
+	_ resource.Resource              = &tfResource{}
+	_ resource.ResourceWithConfigure = &tfResource{}
 )
 
-// bucketResource is the resource implementation.
-type bucketResource struct {
+// tfResource is the resource implementation.
+type tfResource struct {
 	client    dynamic.Interface
 	namespace string
 }
 
-// NewBucketResource is a helper function to simplify the provider implementation.
-func NewBucketResource() resource.Resource {
-	return &bucketResource{}
+// NewTFResource is a helper function to simplify the provider implementation.
+func NewTFResource() resource.Resource {
+	return &tfResource{}
 }
 
 // Metadata returns the resource type name.
-func (r *bucketResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *tfResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_bucket"
 }
 
 // Schema defines the schema for the resource.
-func (r *bucketResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			// Fixed arguments
 			"name": schema.StringAttribute{
 				Required: true,
 				Optional: false,
@@ -62,43 +63,49 @@ func (r *bucketResource) Schema(ctx context.Context, _ resource.SchemaRequest, r
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"prefix": schema.StringAttribute{
-				Required: true,
-				Optional: false,
-				Computed: false,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"tags": schema.MapAttribute{
-				Required:    false,
-				Optional:    true,
-				Computed:    false,
-				ElementType: types.StringType,
-			},
-			"arn": schema.StringAttribute{
-				Computed: true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
+			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
+				Create: true,
+				Update: true,
+				Delete: true,
+			}),
+			// Fixed attributes
 			"resource_version": schema.StringAttribute{
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
-				Create: true,
-				Update: true,
-				Delete: true,
-			}),
+			// Custom arguments
+			"tags": schema.MapAttribute{
+				Required:    false,
+				Optional:    true,
+				Computed:    false,
+				Description: "Tags to apply to the bucket",
+				ElementType: types.StringType,
+			},
+			"prefix": schema.StringAttribute{
+				Required:    true,
+				Optional:    false,
+				Computed:    false,
+				Description: "The prefix to use for the bucket name",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			// Computed attributes
+			"arn": schema.StringAttribute{
+				Computed:    true,
+				Description: "ARN of the bucket",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
 	var plan bucketResourceModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -133,7 +140,7 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	patchOptions := metav1.PatchOptions{
 		FieldManager:    "terraform-provider-crd",
-		Force:           pointer.Bool(true),
+		Force:           ptr.To(true),
 		FieldValidation: "Strict",
 	}
 
@@ -172,7 +179,7 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *tfResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
 	var state bucketResourceModel
 	diags := req.State.Get(ctx, &state)
@@ -212,7 +219,7 @@ func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var plan bucketResourceModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -298,7 +305,7 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *tfResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Get current state
 	var state bucketResourceModel
 	diags := req.State.Get(ctx, &state)
@@ -356,7 +363,7 @@ func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *bucketResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *tfResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -375,7 +382,7 @@ func (r *bucketResource) Configure(_ context.Context, req resource.ConfigureRequ
 	r.namespace = pd.Namespace
 }
 
-func (r *bucketResource) getResource(ctx context.Context, name string) (*K8sCR, error) {
+func (r *tfResource) getResource(ctx context.Context, name string) (*K8sCR, error) {
 	getResponse, err := r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
 		Namespace(r.namespace).
@@ -398,7 +405,7 @@ func (r *bucketResource) getResource(ctx context.Context, name string) (*K8sCR, 
 	return &manifest, nil
 }
 
-func (r *bucketResource) modelToCR(ctx context.Context, model *bucketResourceModel) (*K8sCR, diag.Diagnostics) {
+func (r *tfResource) modelToCR(ctx context.Context, model *bucketResourceModel) (*K8sCR, diag.Diagnostics) {
 	tagElements := make(map[string]types.String, len(model.Tags.Elements()))
 	diags := model.Tags.ElementsAs(ctx, &tagElements, false)
 	if diags.HasError() {
@@ -426,7 +433,7 @@ func (r *bucketResource) modelToCR(ctx context.Context, model *bucketResourceMod
 	}, diags
 }
 
-func (r *bucketResource) waitReady(ctx context.Context, name string, timeout time.Duration) (*K8sCR, error) {
+func (r *tfResource) waitReady(ctx context.Context, name string, timeout time.Duration) (*K8sCR, error) {
 	var cr *K8sCR
 	err := retry.RetryContext(ctx, timeout, func() *retry.RetryError {
 		var err error

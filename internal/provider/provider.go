@@ -109,6 +109,6 @@ func (p *crdProvider) DataSources(_ context.Context) []func() datasource.DataSou
 // Resources defines the resources implemented in the provider.
 func (p *crdProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		prc_com_bucket_v1.NewBucketResource,
+		prc_com_bucket_v1.NewTFResource,
 	}
 }

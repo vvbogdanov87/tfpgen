@@ -29,6 +29,11 @@ func main() {
 		logger.Error("get model template: ", err)
 		os.Exit(1)
 	}
+	resourceTmpl, err := getTemplate("resource.go.tmpl", cwd)
+	if err != nil {
+		logger.Error("get model template: ", err)
+		os.Exit(1)
+	}
 
 	// generate code for each schema from each template
 	schemasDir := filepath.Join(cwd, "../../schemas")
@@ -56,6 +61,11 @@ func main() {
 		err = generateCode(modelTmpl, "model.go", cwd, data)
 		if err != nil {
 			return fmt.Errorf("generate Terraform Resource Model code: %w", err)
+		}
+
+		err = generateCode(resourceTmpl, "resource.go", cwd, data)
+		if err != nil {
+			return fmt.Errorf("generate Terraform resource code: %w", err)
 		}
 
 		return nil

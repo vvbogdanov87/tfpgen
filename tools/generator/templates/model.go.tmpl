@@ -11,8 +11,8 @@ type {{ .RmTypeName }} struct {
 	ResourceVersion types.String   `tfsdk:"resource_version"`
 
 	{{- range .SpecProperties }}
-	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .AnnotationName }}"`{{ end }}
+	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .Name }}"`{{ end }}
 
 	{{- range .StatusProperties }}
-	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .AnnotationName }}"`{{ end }}
+	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .Name }}"`{{ end }}
 }

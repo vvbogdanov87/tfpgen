@@ -1,0 +1,103 @@
+package {{ .PackageName }}
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
+
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/vvbogdanov87/terraform-provider-crd/internal/provider/common"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	k8sSchema "k8s.io/apimachinery/pkg/runtime/schema"
+	k8sTypes "k8s.io/apimachinery/pkg/types"
+
+	"k8s.io/client-go/dynamic"
+
+	"k8s.io/utils/ptr"
+)
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ resource.Resource              = &tfResource{}
+	_ resource.ResourceWithConfigure = &tfResource{}
+)
+
+// tfResource is the resource implementation.
+type tfResource struct {
+	client    dynamic.Interface
+	namespace string
+}
+
+// NewTFResource is a helper function to simplify the provider implementation.
+func NewTFResource() resource.Resource {
+	return &tfResource{}
+}
+
+// Metadata returns the resource type name.
+func (r *tfResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_{{ .ResourceName }}"
+}
+
+// Schema defines the schema for the resource.
+func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			// Fixed arguments
+			"name": schema.StringAttribute{
+				Required: true,
+				Optional: false,
+				Computed: false,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
+				Create: true,
+				Update: true,
+				Delete: true,
+			}),
+			// Fixed attributes
+			"resource_version": schema.StringAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			// Custom arguments
+			{{- range .SpecProperties }}
+			"{{ .Name }}": {{ .ArgumentType }}{
+				Required: {{ .Required }},
+				Optional: {{ .Optional }},
+				Computed: {{ .Computed }},
+				Description: "{{ .Description }}",
+				{{ if .Immutable }}PlanModifiers: []planmodifier.String{
+					{{ .Type }}planmodifier.RequiresReplace(),
+				},{{ end }}
+				{{- if .ElementType }}ElementType: {{ .ElementType }},{{ end }}
+			},
+			{{- end }}
+			// Computed attributes
+			{{- range .StatusProperties }}
+			"{{ .Name }}": {{ .ArgumentType }}{
+				Computed: {{ .Computed }},
+				Description: "{{ .Description }}",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			{{- end }}
+		},
+	}
+}

@@ -14,6 +14,7 @@ import (
 )
 
 type Data struct {
+	ResourceName     string
 	PackageName      string
 	CrdApiVersion    string
 	RmTypeName       string
@@ -22,12 +23,18 @@ type Data struct {
 }
 
 type Property struct {
-	FieldName      string
-	AnnotationName string
-	Type           string
-	TFType         string
-	Properties     []*Property
-	Required       bool
+	Name         string
+	Description  string
+	FieldName    string
+	Type         string
+	TFType       string
+	ArgumentType string
+	ElementType  string
+	Properties   []*Property
+	Required     bool
+	Optional     bool
+	Computed     bool
+	Immutable    bool
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -100,6 +107,7 @@ func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 	}
 
 	return &Data{
+		ResourceName:     kind,
 		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + kind + "_" + strings.ToLower(version.Name),
 		CrdApiVersion:    group + "/" + version.Name,
 		RmTypeName:       strings.ToLower(kind) + "ResourceModel",
@@ -112,23 +120,44 @@ func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Prope
 	properties := make([]*Property, 0, len(schema.Properties))
 	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
-		typeName := sProp.Type
-		tfTypeName := "types." + capitalizer.String(sProp.Type)
-		if typeName == "object" {
+		// Compute types based on the schema type
+		var typeName string
+		var tfTypeName string
+		var argumentTypeName string
+		var elementTypeName string
+		switch sProp.Type {
+		case "string":
+			typeName = "string"
+			tfTypeName = "types.String"
+			argumentTypeName = "schema.StringAttribute"
+		case "object":
 			typeName = "map[string]string"
 			tfTypeName = "types.Map"
+			argumentTypeName = "schema.MapAttribute"
+			elementTypeName = "types.StringType"
 		}
-
 		if computed {
 			typeName = "*" + typeName
 		}
 
+		description := sProp.Description
+		immutable := false
+		if strings.HasPrefix(description, "#immutable#") {
+			immutable = true
+			description = strings.TrimPrefix(description, "#immutable#")
+		}
+
 		prop := &Property{
-			FieldName:      capitalizer.String(name),
-			AnnotationName: name,
-			Type:           typeName,
-			TFType:         tfTypeName,
-			Properties:     crdProperties(sProp, computed),
+			Name:         name,
+			Description:  description,
+			FieldName:    capitalizer.String(name),
+			Type:         typeName,
+			TFType:       tfTypeName,
+			ArgumentType: argumentTypeName,
+			ElementType:  elementTypeName,
+			Computed:     computed,
+			Immutable:    immutable,
+			Properties:   crdProperties(sProp, computed),
 		}
 
 		properties = append(properties, prop)
@@ -136,8 +165,12 @@ func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Prope
 
 	// Mark required properties
 	for _, prop := range properties {
-		if slices.Contains(schema.Required, prop.AnnotationName) {
+		if slices.Contains(schema.Required, prop.Name) {
 			prop.Required = true
+			prop.Optional = false
+		} else {
+			prop.Required = false
+			prop.Optional = true
 		}
 	}
 
