@@ -107,7 +107,7 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 // Create creates the resource and sets the initial Terraform state.
 func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan bucketResourceModel
+	var plan resourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -181,7 +181,7 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 // Read refreshes the Terraform state with the latest data.
 func (r *tfResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state bucketResourceModel
+	var state resourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -221,7 +221,7 @@ func (r *tfResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
-	var plan bucketResourceModel
+	var plan resourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -307,7 +307,7 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *tfResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Get current state
-	var state bucketResourceModel
+	var state resourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -405,7 +405,7 @@ func (r *tfResource) getResource(ctx context.Context, name string) (*K8sCR, erro
 	return &manifest, nil
 }
 
-func (r *tfResource) modelToCR(ctx context.Context, model *bucketResourceModel) (*K8sCR, diag.Diagnostics) {
+func (r *tfResource) modelToCR(ctx context.Context, model *resourceModel) (*K8sCR, diag.Diagnostics) {
 	tagElements := make(map[string]types.String, len(model.Tags.Elements()))
 	diags := model.Tags.ElementsAs(ctx, &tagElements, false)
 	if diags.HasError() {

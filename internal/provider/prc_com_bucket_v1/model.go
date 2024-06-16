@@ -5,11 +5,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type bucketResourceModel struct {
+type resourceModel struct {
 	Name            types.String   `tfsdk:"name"`
 	Timeouts        timeouts.Value `tfsdk:"timeouts"`
 	ResourceVersion types.String   `tfsdk:"resource_version"`
-	Tags            types.Map      `tfsdk:"tags"`
 	Prefix          types.String   `tfsdk:"prefix"`
+	Tags            types.Map      `tfsdk:"tags"`
 	Arn             types.String   `tfsdk:"arn"`
 }

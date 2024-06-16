@@ -17,7 +17,6 @@ type Data struct {
 	ResourceName     string
 	PackageName      string
 	CrdApiVersion    string
-	RmTypeName       string
 	SpecProperties   []*Property
 	StatusProperties []*Property
 }
@@ -110,7 +109,6 @@ func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 		ResourceName:     kind,
 		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + kind + "_" + strings.ToLower(version.Name),
 		CrdApiVersion:    group + "/" + version.Name,
-		RmTypeName:       strings.ToLower(kind) + "ResourceModel",
 		SpecProperties:   crdProperties(spec, false),
 		StatusProperties: crdProperties(status, true),
 	}
