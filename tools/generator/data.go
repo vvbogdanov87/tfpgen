@@ -14,6 +14,10 @@ import (
 )
 
 type Data struct {
+	Group            string
+	Version          string
+	Resource         string
+	Kind             string
 	ResourceName     string
 	PackageName      string
 	CrdApiVersion    string
@@ -22,18 +26,19 @@ type Data struct {
 }
 
 type Property struct {
-	Name         string
-	Description  string
-	FieldName    string
-	Type         string
-	TFType       string
-	ArgumentType string
-	ElementType  string
-	Properties   []*Property
-	Required     bool
-	Optional     bool
-	Computed     bool
-	Immutable    bool
+	Name           string
+	Description    string
+	FieldName      string
+	Type           string
+	TFType         string
+	ArgumentType   string
+	ElementType    string
+	Properties     []*Property
+	Required       bool
+	Optional       bool
+	Computed       bool
+	Immutable      bool
+	GetValueMethod string
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -71,7 +76,8 @@ func loadSchema(file string) (*apiextensions.CustomResourceDefinition, error) {
 
 func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 	group := crd.Spec.Group
-	kind := strings.ToLower(crd.Spec.Names.Kind)
+	kind := crd.Spec.Names.Kind
+	resourceName := strings.ToLower(kind)
 
 	// We assume that there is only one version
 	version := crd.Spec.Versions[0]
@@ -106,8 +112,12 @@ func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 	}
 
 	return &Data{
-		ResourceName:     kind,
-		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + kind + "_" + strings.ToLower(version.Name),
+		Kind:             kind,
+		Group:            group,
+		Resource:         crd.Spec.Names.Plural,
+		Version:          version.Name,
+		ResourceName:     resourceName,
+		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + resourceName + "_" + strings.ToLower(version.Name),
 		CrdApiVersion:    group + "/" + version.Name,
 		SpecProperties:   crdProperties(spec, false),
 		StatusProperties: crdProperties(status, true),
@@ -146,16 +156,17 @@ func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Prope
 		}
 
 		prop := &Property{
-			Name:         name,
-			Description:  description,
-			FieldName:    capitalizer.String(name),
-			Type:         typeName,
-			TFType:       tfTypeName,
-			ArgumentType: argumentTypeName,
-			ElementType:  elementTypeName,
-			Computed:     computed,
-			Immutable:    immutable,
-			Properties:   crdProperties(sProp, computed),
+			Name:           name,
+			Description:    description,
+			FieldName:      capitalizer.String(name),
+			Type:           typeName,
+			TFType:         tfTypeName,
+			ArgumentType:   argumentTypeName,
+			ElementType:    elementTypeName,
+			Computed:       computed,
+			Immutable:      immutable,
+			GetValueMethod: "Value" + capitalizer.String(typeName) + "()",
+			Properties:     crdProperties(sProp, computed),
 		}
 
 		properties = append(properties, prop)

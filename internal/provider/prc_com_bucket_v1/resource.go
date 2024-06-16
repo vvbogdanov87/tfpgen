@@ -167,7 +167,7 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// Set computed values
-	plan.Arn = types.StringValue(*cr.Status.Arn)
+	setComputedValues(&plan, cr)
 	plan.ResourceVersion = types.StringValue(cr.ResourceVersion)
 
 	// Set state to fully populated data
@@ -294,7 +294,7 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 	// Set computed values
-	plan.Arn = types.StringValue(*cr.Status.Arn)
+	setComputedValues(&plan, cr)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -382,29 +382,6 @@ func (r *tfResource) Configure(_ context.Context, req resource.ConfigureRequest,
 	r.namespace = pd.Namespace
 }
 
-func (r *tfResource) getResource(ctx context.Context, name string) (*K8sCR, error) {
-	getResponse, err := r.client.
-		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
-		Namespace(r.namespace).
-		Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := getResponse.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	var manifest K8sCR
-	err = json.Unmarshal(body, &manifest)
-	if err != nil {
-		return nil, err
-	}
-
-	return &manifest, nil
-}
-
 func (r *tfResource) modelToCR(ctx context.Context, model *resourceModel) (*K8sCR, diag.Diagnostics) {
 	tagElements := make(map[string]types.String, len(model.Tags.Elements()))
 	diags := model.Tags.ElementsAs(ctx, &tagElements, false)
@@ -433,6 +410,29 @@ func (r *tfResource) modelToCR(ctx context.Context, model *resourceModel) (*K8sC
 	}, diags
 }
 
+func (r *tfResource) getResource(ctx context.Context, name string) (*K8sCR, error) {
+	getResponse, err := r.client.
+		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
+		Namespace(r.namespace).
+		Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := getResponse.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest K8sCR
+	err = json.Unmarshal(body, &manifest)
+	if err != nil {
+		return nil, err
+	}
+
+	return &manifest, nil
+}
+
 func (r *tfResource) waitReady(ctx context.Context, name string, timeout time.Duration) (*K8sCR, error) {
 	var cr *K8sCR
 	err := retry.RetryContext(ctx, timeout, func() *retry.RetryError {
@@ -454,4 +454,9 @@ func (r *tfResource) waitReady(ctx context.Context, name string, timeout time.Du
 		return retry.RetryableError(fmt.Errorf("resource is not READY"))
 	})
 	return cr, err
+}
+
+// Set computed values
+func setComputedValues(plan *resourceModel, cr *K8sCR) {
+	plan.Arn = types.StringValue(*cr.Status.Arn)
 }
