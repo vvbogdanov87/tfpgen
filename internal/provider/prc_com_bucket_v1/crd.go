@@ -15,8 +15,7 @@ type K8sCR struct {
 }
 
 type K8sSpec struct {
-	Tags   map[string]string `json:"tags"`
-	Prefix string            `json:"prefix,omitempty"`
+	Prefix string `json:"prefix,omitempty"`
 }
 
 type K8sStatus struct {

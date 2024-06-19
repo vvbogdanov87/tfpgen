@@ -27,9 +27,6 @@ spec:
               string:
                 type: Format
                 fmt: "%s-prc-bucket"
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.tags
-          toFieldPath: spec.forProvider.tags
         - type: ToCompositeFieldPath
           fromFieldPath: status.atProvider.arn
           toFieldPath: status.arn

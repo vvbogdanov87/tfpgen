@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -122,11 +121,7 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// Convert model to custom resource
-	cr, diags := r.modelToCR(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	cr := r.modelToCR(&plan)
 
 	// Create new resource
 	body, err := json.Marshal(cr)
@@ -239,11 +234,7 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// Convert model to custom resource
-	cr, diag := r.modelToCR(ctx, &plan)
-	resp.Diagnostics.Append(diag...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	cr := r.modelToCR(&plan)
 
 	// Update resource
 	body, err := json.Marshal(cr)
@@ -386,7 +377,7 @@ func (r *tfResource) Configure(_ context.Context, req resource.ConfigureRequest,
 }
 
 // TODO: handle maps
-func (r *tfResource) modelToCR(ctx context.Context, model *resourceModel) (*K8sCR, diag.Diagnostics) {
+func (r *tfResource) modelToCR(model *resourceModel) *K8sCR {
 	return &K8sCR{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: k8sApiVersion,
@@ -399,10 +390,10 @@ func (r *tfResource) modelToCR(ctx context.Context, model *resourceModel) (*K8sC
 		},
 		Spec: K8sSpec{
 			{{- range .SpecProperties }}
-    		{{ .FieldName }}: model.{{ .FieldName }}.{{ .GetValueMethod }},
+			{{ .FieldName }}: model.{{ .FieldName }}.{{ .GetValueMethod }},
 			{{- end }}
 		},
-	}, diags
+	}
 }
 
 func (r *tfResource) getResource(ctx context.Context, name string) (*K8sCR, error) {

@@ -24,14 +24,10 @@ spec:
             properties:
               prefix:
                 type: string
+                description: "(immutable) The prefix to use for the bucket name"
                 x-kubernetes-validations:
                 - rule: self == oldSelf
                   message: Value is immutable
-              tags:
-                type: object
-                additionalProperties:
-                  type: string
-                x-kubernetes-map-type: atomic
             required:
               - prefix
           status:
@@ -39,3 +35,4 @@ spec:
             properties:
               arn:
                 type: string
+                description: "ARN of the bucket"

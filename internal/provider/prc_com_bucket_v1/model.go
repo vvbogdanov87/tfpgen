@@ -10,6 +10,5 @@ type resourceModel struct {
 	Timeouts        timeouts.Value `tfsdk:"timeouts"`
 	ResourceVersion types.String   `tfsdk:"resource_version"`
 	Prefix          types.String   `tfsdk:"prefix"`
-	Tags            types.Map      `tfsdk:"tags"`
 	Arn             types.String   `tfsdk:"arn"`
 }

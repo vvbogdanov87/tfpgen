@@ -1,3 +1,5 @@
+// TODO: handle maps in modelToCR and Read methods
+
 package prc_com_bucket_v1
 
 import (
@@ -6,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -76,18 +77,11 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			// Custom arguments
-			"tags": schema.MapAttribute{
-				Required:    false,
-				Optional:    true,
-				Computed:    false,
-				Description: "Tags to apply to the bucket",
-				ElementType: types.StringType,
-			},
 			"prefix": schema.StringAttribute{
 				Required:    true,
 				Optional:    false,
 				Computed:    false,
-				Description: "The prefix to use for the bucket name",
+				Description: "(immutable) The prefix to use for the bucket name",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -122,11 +116,7 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// Convert model to custom resource
-	cr, diags := r.modelToCR(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	cr := r.modelToCR(&plan)
 
 	// Create new resource
 	body, err := json.Marshal(cr)
@@ -202,8 +192,10 @@ func (r *tfResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 
 	// Overwrite current state with refreshed state
+
+	// TODO: handle maps
 	state.Prefix = types.StringValue(cr.Spec.Prefix)
-	state.Tags, diags = types.MapValueFrom(ctx, types.StringType, cr.Spec.Tags)
+
 	state.ResourceVersion = types.StringValue(cr.ResourceVersion)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -236,11 +228,7 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// Convert model to custom resource
-	cr, diag := r.modelToCR(ctx, &plan)
-	resp.Diagnostics.Append(diag...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	cr := r.modelToCR(&plan)
 
 	// Update resource
 	body, err := json.Marshal(cr)
@@ -382,17 +370,8 @@ func (r *tfResource) Configure(_ context.Context, req resource.ConfigureRequest,
 	r.namespace = pd.Namespace
 }
 
-func (r *tfResource) modelToCR(ctx context.Context, model *resourceModel) (*K8sCR, diag.Diagnostics) {
-	tagElements := make(map[string]types.String, len(model.Tags.Elements()))
-	diags := model.Tags.ElementsAs(ctx, &tagElements, false)
-	if diags.HasError() {
-		return nil, diags
-	}
-	tags := make(map[string]string, len(tagElements))
-	for k, v := range tagElements {
-		tags[k] = v.ValueString()
-	}
-
+// TODO: handle maps
+func (r *tfResource) modelToCR(model *resourceModel) *K8sCR {
 	return &K8sCR{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: k8sApiVersion,
@@ -405,9 +384,8 @@ func (r *tfResource) modelToCR(ctx context.Context, model *resourceModel) (*K8sC
 		},
 		Spec: K8sSpec{
 			Prefix: model.Prefix.ValueString(),
-			Tags:   tags,
 		},
-	}, diags
+	}
 }
 
 func (r *tfResource) getResource(ctx context.Context, name string) (*K8sCR, error) {

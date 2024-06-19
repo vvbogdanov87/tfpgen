@@ -150,7 +150,7 @@ func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Prope
 
 		description := sProp.Description
 		immutable := false
-		if strings.HasPrefix(description, "#immutable#") {
+		if strings.HasPrefix(description, "(immutable)") {
 			immutable = true
 			description = strings.TrimPrefix(description, "#immutable#")
 		}

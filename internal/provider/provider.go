@@ -10,9 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/vvbogdanov87/terraform-provider-crd/internal/provider/common"
-	"github.com/vvbogdanov87/terraform-provider-crd/internal/provider/prc_com_bucket_v1"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
@@ -104,11 +102,4 @@ func (p *crdProvider) Configure(ctx context.Context, req provider.ConfigureReque
 // DataSources defines the data sources implemented in the provider.
 func (p *crdProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return nil
-}
-
-// Resources defines the resources implemented in the provider.
-func (p *crdProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{
-		prc_com_bucket_v1.NewTFResource,
-	}
 }
