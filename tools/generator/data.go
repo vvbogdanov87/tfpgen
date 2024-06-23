@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -33,12 +33,12 @@ type Property struct {
 	TFType         string
 	ArgumentType   string
 	ElementType    string
-	Properties     []*Property
 	Required       bool
 	Optional       bool
 	Computed       bool
 	Immutable      bool
 	GetValueMethod string
+	Properties     []*Property
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -52,7 +52,7 @@ func parseSchema(file string) (*Data, error) {
 	return crdToData(crd), nil
 }
 
-func loadSchema(file string) (*apiextensions.CustomResourceDefinition, error) {
+func loadSchema(file string) (*apiextensionsv1.CustomResourceDefinition, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", file, err)
@@ -66,7 +66,7 @@ func loadSchema(file string) (*apiextensions.CustomResourceDefinition, error) {
 		return nil, fmt.Errorf("failed to read yaml from file %s: %w", file, err)
 	}
 
-	crd := &apiextensions.CustomResourceDefinition{}
+	crd := &apiextensionsv1.CustomResourceDefinition{}
 	if err := yaml.Unmarshal(data, crd); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal yaml from file %s: %w", file, err)
 	}
@@ -74,7 +74,7 @@ func loadSchema(file string) (*apiextensions.CustomResourceDefinition, error) {
 	return crd, nil
 }
 
-func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
+func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
 	group := crd.Spec.Group
 	kind := crd.Spec.Names.Kind
 	resourceName := strings.ToLower(kind)
@@ -119,12 +119,12 @@ func crdToData(crd *apiextensions.CustomResourceDefinition) *Data {
 		ResourceName:     resourceName,
 		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + resourceName + "_" + strings.ToLower(version.Name),
 		CrdApiVersion:    group + "/" + version.Name,
-		SpecProperties:   crdProperties(spec, false),
-		StatusProperties: crdProperties(status, true),
+		SpecProperties:   crdProperties(&spec, false),
+		StatusProperties: crdProperties(&status, true),
 	}
 }
 
-func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Property {
+func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Property {
 	properties := make([]*Property, 0, len(schema.Properties))
 	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
@@ -133,16 +133,34 @@ func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Prope
 		var tfTypeName string
 		var argumentTypeName string
 		var elementTypeName string
+
+		var nestedProperties []*Property
+
 		switch sProp.Type {
 		case "string":
 			typeName = "string"
 			tfTypeName = "types.String"
 			argumentTypeName = "schema.StringAttribute"
 		case "object":
-			typeName = "map[string]string"
-			tfTypeName = "types.Map"
-			argumentTypeName = "schema.MapAttribute"
-			elementTypeName = "types.StringType"
+			// AdditionalProperties and Properties are mutually exclusive
+			if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
+				if sProp.AdditionalProperties.Schema.Type == "object" { // map[string]struct
+					typeName = "map"
+					nestedProperties = crdProperties(sProp.AdditionalProperties.Schema, computed)
+				} else { // map[string]primitive
+					typeName = "map[string]" + sProp.AdditionalProperties.Schema.Type
+				}
+			} else if len(sProp.Properties) > 0 { // object with Properties is a struct
+				typeName = "struct"
+				nestedProperties = crdProperties(&sProp, computed)
+			}
+		case "array":
+			if sProp.Items.Schema.Type == "object" { // array of struct
+				typeName = "array"
+				nestedProperties = crdProperties(sProp.Items.Schema, computed)
+			} else { // array of primitive
+				typeName = "[]" + sProp.Items.Schema.Type
+			}
 		}
 		if computed {
 			typeName = "*" + typeName
@@ -166,7 +184,7 @@ func crdProperties(schema apiextensions.JSONSchemaProps, computed bool) []*Prope
 			Computed:       computed,
 			Immutable:      immutable,
 			GetValueMethod: "Value" + capitalizer.String(typeName) + "()",
-			Properties:     crdProperties(sProp, computed),
+			Properties:     nestedProperties,
 		}
 
 		properties = append(properties, prop)

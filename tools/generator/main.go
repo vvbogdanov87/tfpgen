@@ -37,7 +37,7 @@ func main() {
 func generateResources(cwd string) ([]string, error) {
 	resourcesPath := "internal/provider/resources"
 
-	crdTmpl, err := getTemplate(cwd, resourcesPath, "crd.go.tmpl")
+	crdTmpl, err := getTemplate(cwd, resourcesPath, "crd.go.tmpl", "crd_property.go.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("get crd template: %w", err)
 	}
@@ -118,9 +118,12 @@ func generateProviderResources(cwd string, packages []string) error {
 	return nil
 }
 
-func getTemplate(cwd, tmplPath, tmplName string) (*template.Template, error) {
-	tmplFilePath := filepath.Join(cwd, "templates", tmplPath, tmplName)
-	return template.New(tmplName).ParseFiles(tmplFilePath)
+func getTemplate(cwd, tmplPath string, tmplNames ...string) (*template.Template, error) {
+	var tmplFilePaths []string
+	for _, name := range tmplNames {
+		tmplFilePaths = append(tmplFilePaths, filepath.Join(cwd, "templates", tmplPath, name))
+	}
+	return template.New(tmplNames[0]).ParseFiles(tmplFilePaths...)
 }
 
 func generateCode(tmpl *template.Template, data any, outDir, outFileName string) error {

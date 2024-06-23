@@ -15,8 +15,9 @@ type K8sCR struct {
 }
 
 type K8sSpec struct {
-    {{- range .SpecProperties }}
-    {{ .FieldName }} {{ .Type }} `json:"{{ .Name }}{{ if .Required }},omitempty{{ end }}"`{{ end }}
+	{{- range .SpecProperties }}
+	{{ template "crd_property.go.tmpl" . }}
+	{{ end -}}
 }
 
 type K8sStatus struct {
