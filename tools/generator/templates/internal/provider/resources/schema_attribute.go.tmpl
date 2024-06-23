@@ -1,0 +1,23 @@
+"{{ .Name }}": {{ .ArgumentType }}{
+Required: {{ .Required }},
+Optional: {{ .Optional }},
+Computed: {{ .Computed }},
+{{- if .Description }}Description: "{{ .Description }}",{{ end }}
+{{ if .Immutable }}PlanModifiers: []planmodifier.String{
+	{{ .Type }}planmodifier.RequiresReplace(),
+},{{ end }}
+{{- if .ElementType }}ElementType: {{ .ElementType }},{{ end }}
+{{ if eq .Type "struct" -}}
+	Attributes: map[string]schema.Attribute{
+	{{ range .Properties -}}
+		{{ template "schema_attribute.go.tmpl" . }}
+	{{ end -}}
+{{ else if eq .Type "array" -}}
+	NestedObject: schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+		{{ range .Properties -}}
+			{{ template "schema_attribute.go.tmpl" . }}
+		{{ end -}}
+		},
+{{ end -}}
+},

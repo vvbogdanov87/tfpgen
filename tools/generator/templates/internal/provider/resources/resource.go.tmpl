@@ -77,18 +77,11 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			// Custom arguments
-			{{- range .SpecProperties }}
-			"{{ .Name }}": {{ .ArgumentType }}{
-				Required: {{ .Required }},
-				Optional: {{ .Optional }},
-				Computed: {{ .Computed }},
-				Description: "{{ .Description }}",
-				{{ if .Immutable }}PlanModifiers: []planmodifier.String{
-					{{ .Type }}planmodifier.RequiresReplace(),
-				},{{ end }}
-				{{- if .ElementType }}ElementType: {{ .ElementType }},{{ end }}
-			},
-			{{- end }}
+			{{ range .SpecProperties }}
+			{{ template "schema_attribute.go.tmpl" . }}
+			{{ end }}
+
+
 			// Computed attributes
 			{{- range .StatusProperties }}
 			"{{ .Name }}": {{ .ArgumentType }}{

@@ -45,7 +45,7 @@ func generateResources(cwd string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get model template: %w", err)
 	}
-	resourceTmpl, err := getTemplate(cwd, resourcesPath, "resource.go.tmpl")
+	resourceTmpl, err := getTemplate(cwd, resourcesPath, "resource.go.tmpl", "schema_attribute.go.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("get resource template: %w", err)
 	}

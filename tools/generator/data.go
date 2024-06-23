@@ -146,20 +146,32 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 			if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
 				if sProp.AdditionalProperties.Schema.Type == "object" { // map[string]struct
 					typeName = "map"
+					tfTypeName = "types.Map"
+					argumentTypeName = "schema.MapNestedAttribute"
 					nestedProperties = crdProperties(sProp.AdditionalProperties.Schema, computed)
 				} else { // map[string]primitive
 					typeName = "map[string]" + sProp.AdditionalProperties.Schema.Type
+					tfTypeName = "types.Map"
+					argumentTypeName = "schema.MapAttribute"
+					elementTypeName = "types." + capitalizer.String(sProp.AdditionalProperties.Schema.Type) + "Type"
 				}
 			} else if len(sProp.Properties) > 0 { // object with Properties is a struct
 				typeName = "struct"
+				tfTypeName = "types.Object"
+				argumentTypeName = "schema.SingleNestedAttribute"
 				nestedProperties = crdProperties(&sProp, computed)
 			}
 		case "array":
 			if sProp.Items.Schema.Type == "object" { // array of struct
 				typeName = "array"
+				tfTypeName = "types.List"
+				argumentTypeName = "schema.ListNestedAttribute"
 				nestedProperties = crdProperties(sProp.Items.Schema, computed)
 			} else { // array of primitive
 				typeName = "[]" + sProp.Items.Schema.Type
+				tfTypeName = "types.List"
+				argumentTypeName = "schema.ListAttribute"
+				elementTypeName = "types." + capitalizer.String(sProp.Items.Schema.Type) + "Type"
 			}
 		}
 		if computed {
