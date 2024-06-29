@@ -69,6 +69,7 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 				Update: true,
 				Delete: true,
 			}),
+
 			// Fixed attributes
 			"resource_version": schema.StringAttribute{
 				Computed: true,
@@ -76,22 +77,17 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+
 			// Custom arguments
-			{{ range .SpecProperties }}
+			{{ range .SpecProperties -}}
 			{{ template "schema_attribute.go.tmpl" . }}
 			{{ end }}
 
 
 			// Computed attributes
-			{{- range .StatusProperties }}
-			"{{ .Name }}": {{ .ArgumentType }}{
-				Computed: {{ .Computed }},
-				Description: "{{ .Description }}",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			{{- end }}
+			{{ range .StatusProperties -}}
+			{{ template "schema_attribute.go.tmpl" . }}
+			{{ end }}
 		},
 	}
 }
