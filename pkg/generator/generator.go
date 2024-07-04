@@ -1,35 +1,33 @@
-package main
+package generator
 
 import (
 	"fmt"
 	"go/format"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"text/template"
+
+	"github.com/vvbogdanov87/tfpgen/pkg/config"
 )
 
-var logger = slog.Default()
-
-func main() {
+func Generate(config *config.Config) error {
 	// TODO: handle working directory when started from a different locations (e.g. vscode debug vs make generate)
 	cwd, err := os.Getwd()
 	if err != nil {
-		logger.Error("get working directory", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("get working directory: %w", err)
 	}
 
 	packages, err := generateResources(cwd)
 	if err != nil {
-		logger.Error("generate resources", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("generate resources: %w", err)
 	}
 
 	err = generateProviderResources(cwd, packages)
 	if err != nil {
-		logger.Error("generate provider resources method", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("generate provider resources method: %w", err)
 	}
+
+	return nil
 }
 
 func generateResources(cwd string) ([]string, error) {
