@@ -1,5 +1,3 @@
-// TODO: handle maps in modelToCR and Read methods
-
 package prc_com_bucket_v1
 
 import (
@@ -8,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -68,7 +67,10 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 				Create: true,
 				Update: true,
 				Delete: true,
+				// TODO: add reties to get resource method
+				Read: true,
 			}),
+
 			// Fixed attributes
 			"resource_version": schema.StringAttribute{
 				Computed: true,
@@ -76,22 +78,107 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+
 			// Custom arguments
-			"prefix": schema.StringAttribute{
+			"spec": schema.SingleNestedAttribute{
+				Description: "Spec is the specification of a resource.",
 				Required:    true,
-				Optional:    false,
-				Computed:    false,
-				Description: "(immutable) The prefix to use for the bucket name",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+				Attributes: map[string]schema.Attribute{
+					"prefix": schema.StringAttribute{
+						Required:    true,
+						Optional:    false,
+						Computed:    false,
+						Description: "(immutable) The prefix to use for the bucket name",
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
+					},
+					"arrobj": schema.ListNestedAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"arrprop1": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+								"arrprop2": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+							},
+						},
+					},
+					"arrstr": schema.ListAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						ElementType: types.StringType,
+					},
+					"mapobj": schema.MapNestedAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"objprop2": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+								"objprop1": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+							},
+						},
+					},
+					"mapstr": schema.MapAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						ElementType: types.StringType,
+					},
+					"strobj": schema.SingleNestedAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						Attributes: map[string]schema.Attribute{
+							"prop1": schema.StringAttribute{
+								Required: false,
+								Optional: true,
+								Computed: false,
+							},
+							"prop2": schema.StringAttribute{
+								Required: false,
+								Optional: true,
+								Computed: false,
+							},
+						},
+					},
 				},
 			},
+
 			// Computed attributes
-			"arn": schema.StringAttribute{
+			"status": schema.SingleNestedAttribute{
+				Description: "Status is the specification of a resource status.",
 				Computed:    true,
-				Description: "ARN of the bucket",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+				Attributes: map[string]schema.Attribute{
+					"arn": schema.StringAttribute{
+						Required:    false,
+						Optional:    true,
+						Computed:    true,
+						Description: "ARN of the bucket",
+					},
 				},
 			},
 		},
@@ -101,12 +188,22 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 // Create creates the resource and sets the initial Terraform state.
 func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan resourceModel
-	diags := req.Plan.Get(ctx, &plan)
+	var plan K8sCR
+	// Plan is read partially because terraform types can't convert unknown values(the ones that are computed) to go values(eg. struct, *struct).
+	// So we simply don't read the Status field(which is computed) from the plan.
+	diags := req.Plan.GetAttribute(ctx, path.Root("spec"), &plan.Spec)
+	resp.Diagnostics.Append(diags...)
+	diags = req.Plan.GetAttribute(ctx, path.Root("name"), &plan.Name)
+	resp.Diagnostics.Append(diags...)
+	diags = req.Plan.GetAttribute(ctx, path.Root("timeouts"), &plan.Timeouts)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	plan.APIVersion = "prc.com/v1"
+	plan.Kind = "Bucket"
+	plan.Metadata.Name = plan.Name.ValueString()
 
 	// Get timeout
 	createTimeout, diags := plan.Timeouts.Create(ctx, 5*time.Minute)
@@ -115,11 +212,8 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	// Convert model to custom resource
-	cr := r.modelToCR(&plan)
-
 	// Create new resource
-	body, err := json.Marshal(cr)
+	body, err := json.Marshal(plan)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"marshal resource",
@@ -136,8 +230,8 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	_, err = r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
-		Namespace(cr.Namespace).
-		Patch(ctx, cr.Name, k8sTypes.ApplyPatchType, body, patchOptions)
+		Namespace(r.namespace).
+		Patch(ctx, plan.Name.ValueString(), k8sTypes.ApplyPatchType, body, patchOptions)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Create resource",
@@ -147,7 +241,7 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// wait for resource becomes READY
-	cr, err = r.waitReady(ctx, plan.Name.ValueString(), createTimeout)
+	cr, err := r.waitReady(ctx, plan.Name.ValueString(), createTimeout)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Waiting resource READY",
@@ -156,12 +250,14 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	// Set computed values
-	setComputedValues(&plan, cr)
-	plan.ResourceVersion = types.StringValue(cr.ResourceVersion)
+	// ResourceVersion is required to properly update resources after creation.
+	cr.ResourceVersion = types.StringValue(cr.Metadata.ResourceVersion)
+	// We need to populate TF schema specific fields.
+	cr.Name = plan.Name
+	cr.Timeouts = plan.Timeouts
 
 	// Set state to fully populated data
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, cr)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -169,10 +265,15 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 }
 
 // Read refreshes the Terraform state with the latest data.
+// TODO: Read is identical for all resources. Consider moving to a common implementation.
 func (r *tfResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state resourceModel
-	diags := req.State.Get(ctx, &state)
+	var state K8sCR
+	diags := req.State.GetAttribute(ctx, path.Root("spec"), &state.Spec)
+	resp.Diagnostics.Append(diags...)
+	diags = req.State.GetAttribute(ctx, path.Root("name"), &state.Name)
+	resp.Diagnostics.Append(diags...)
+	diags = req.State.GetAttribute(ctx, path.Root("timeouts"), &state.Timeouts)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		resp.Diagnostics.AddError(
@@ -191,19 +292,14 @@ func (r *tfResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	// Overwrite current state with refreshed state
-
-	// TODO: handle maps
-	state.Prefix = types.StringValue(cr.Spec.Prefix)
-
-	state.ResourceVersion = types.StringValue(cr.ResourceVersion)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// ResourceVersion is required to properly update resources after creation.
+	cr.ResourceVersion = types.StringValue(cr.Metadata.ResourceVersion)
+	// We need to populate TF schema specific fields.
+	cr.Name = state.Name
+	cr.Timeouts = state.Timeouts
 
 	// Set refreshed state
-	diags = resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &cr)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -213,11 +309,25 @@ func (r *tfResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
-	var plan resourceModel
-	diags := req.Plan.Get(ctx, &plan)
+	var plan K8sCR
+	diags := req.Plan.GetAttribute(ctx, path.Root("spec"), &plan.Spec)
+	resp.Diagnostics.Append(diags...)
+	diags = req.Plan.GetAttribute(ctx, path.Root("name"), &plan.Name)
+	resp.Diagnostics.Append(diags...)
+	diags = req.Plan.GetAttribute(ctx, path.Root("timeouts"), &plan.Timeouts)
+	resp.Diagnostics.Append(diags...)
+	diags = req.Plan.GetAttribute(ctx, path.Root("resource_version"), &plan.ResourceVersion)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	plan.APIVersion = "prc.com/v1"
+	plan.Kind = "Bucket"
+	plan.Metadata = metav1.ObjectMeta{
+		Name: plan.Name.ValueString(),
+		// ResourceVersion is required to update a resource.
+		ResourceVersion: plan.ResourceVersion.ValueString(),
 	}
 
 	// Get timeout
@@ -227,11 +337,8 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	// Convert model to custom resource
-	cr := r.modelToCR(&plan)
-
 	// Update resource
-	body, err := json.Marshal(cr)
+	body, err := json.Marshal(plan)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"marshal resource",
@@ -252,7 +359,7 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 
 	_, err = r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
-		Namespace(cr.Namespace).
+		Namespace(r.namespace).
 		Update(ctx, unstructuredObj, metav1.UpdateOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -266,7 +373,7 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// It takes some time to controller to change Ready status to False so we need to wait for it.
 	time.Sleep(500 * time.Millisecond)
 	// wait for Rady status to be True
-	cr, err = r.waitReady(ctx, plan.Name.ValueString(), updateTimeout)
+	cr, err := r.waitReady(ctx, plan.Name.ValueString(), updateTimeout)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Waiting resource READY",
@@ -281,11 +388,17 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		)
 		return
 	}
-	// Set computed values
-	setComputedValues(&plan, cr)
+
+	// ResourceVersion is set to the one before the update.
+	// This is required to avoid errors when populating the state.
+	// A new ResourceVersion will be read before updating anyway.
+	cr.ResourceVersion = plan.ResourceVersion
+	// We need to populate TF schema specific fields.
+	cr.Name = plan.Name
+	cr.Timeouts = plan.Timeouts
 
 	// Set state to fully populated data
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, cr)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -295,8 +408,12 @@ func (r *tfResource) Update(ctx context.Context, req resource.UpdateRequest, res
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *tfResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Get current state
-	var state resourceModel
-	diags := req.State.Get(ctx, &state)
+	var state K8sCR
+	diags := req.State.GetAttribute(ctx, path.Root("spec"), &state.Spec)
+	resp.Diagnostics.Append(diags...)
+	diags = req.State.GetAttribute(ctx, path.Root("name"), &state.Name)
+	resp.Diagnostics.Append(diags...)
+	diags = req.State.GetAttribute(ctx, path.Root("timeouts"), &state.Timeouts)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -370,24 +487,7 @@ func (r *tfResource) Configure(_ context.Context, req resource.ConfigureRequest,
 	r.namespace = pd.Namespace
 }
 
-// TODO: handle maps
-func (r *tfResource) modelToCR(model *resourceModel) *K8sCR {
-	return &K8sCR{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: k8sApiVersion,
-			Kind:       "Bucket",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            model.Name.ValueString(),
-			Namespace:       r.namespace,
-			ResourceVersion: model.ResourceVersion.ValueString(),
-		},
-		Spec: K8sSpec{
-			Prefix: model.Prefix.ValueString(),
-		},
-	}
-}
-
+// TODO: Add retry logic to getResource method
 func (r *tfResource) getResource(ctx context.Context, name string) (*K8sCR, error) {
 	getResponse, err := r.client.
 		Resource(k8sSchema.GroupVersionResource{Group: "prc.com", Version: "v1", Resource: "buckets"}).
@@ -420,8 +520,8 @@ func (r *tfResource) waitReady(ctx context.Context, name string, timeout time.Du
 			return retry.RetryableError(fmt.Errorf("getting resource: %w", err))
 		}
 
-		if cr.Status.Conditions == nil {
-			return retry.RetryableError(fmt.Errorf("resource doesn't have 'conditions' field"))
+		if cr.Status == nil || cr.Status.Conditions == nil {
+			return retry.RetryableError(fmt.Errorf("resource doesn't have 'status.conditions' field"))
 		}
 
 		for _, condition := range *cr.Status.Conditions {
@@ -432,9 +532,4 @@ func (r *tfResource) waitReady(ctx context.Context, name string, timeout time.Du
 		return retry.RetryableError(fmt.Errorf("resource is not READY"))
 	})
 	return cr, err
-}
-
-// Set computed values
-func setComputedValues(plan *resourceModel, cr *K8sCR) {
-	plan.Arn = types.StringValue(*cr.Status.Arn)
 }

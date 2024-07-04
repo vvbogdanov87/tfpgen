@@ -27,7 +27,41 @@ spec:
                 description: "(immutable) The prefix to use for the bucket name"
                 x-kubernetes-validations:
                 - rule: self == oldSelf
-                  message: Value is immutable
+              mapstr:
+                type: object
+                additionalProperties:
+                  type: string
+                x-kubernetes-map-type: atomic
+              mapobj:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    objprop1:
+                      type: string
+                    objprop2:
+                      type: string
+                x-kubernetes-map-type: atomic
+              strobj:
+                type: object
+                properties:
+                  prop1:
+                    type: string
+                  prop2:
+                    type: string
+              arrstr:
+                type: array
+                items:
+                  type: string
+              arrobj:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    arrprop1:
+                      type: string
+                    arrprop2:
+                      type: string
             required:
               - prefix
           status:

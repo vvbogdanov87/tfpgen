@@ -41,11 +41,8 @@ func generateResources(cwd string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get crd template: %w", err)
 	}
-	modelTmpl, err := getTemplate(cwd, resourcesPath, "model.go.tmpl", "model_property.go.tmpl")
-	if err != nil {
-		return nil, fmt.Errorf("get model template: %w", err)
-	}
-	resourceTmpl, err := getTemplate(cwd, resourcesPath, "resource.go.tmpl", "schema_attribute.go.tmpl", "model_to_cr_field.go.tmpl")
+
+	resourceTmpl, err := getTemplate(cwd, resourcesPath, "resource.go.tmpl", "schema_attribute.go.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("get resource template: %w", err)
 	}
@@ -79,11 +76,6 @@ func generateResources(cwd string) ([]string, error) {
 		err = generateCode(crdTmpl, data, outDir, "crd.go")
 		if err != nil {
 			return fmt.Errorf("generate CRD code: %w", err)
-		}
-
-		err = generateCode(modelTmpl, data, outDir, "model.go")
-		if err != nil {
-			return fmt.Errorf("generate Terraform Resource Model code: %w", err)
 		}
 
 		err = generateCode(resourceTmpl, data, outDir, "resource.go")

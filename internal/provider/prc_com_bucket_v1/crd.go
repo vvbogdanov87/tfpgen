@@ -1,28 +1,51 @@
 package prc_com_bucket_v1
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const k8sApiVersion = "prc.com/v1"
-
 type K8sCR struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `tfsdk:"-" json:",inline"`
+	Metadata        metav1.ObjectMeta `tfsdk:"-" json:"metadata,omitempty"`
 
-	Spec   K8sSpec   `json:"spec,omitempty"`
-	Status K8sStatus `json:"status"`
+	Name            types.String   `tfsdk:"name" json:"-"`
+	Timeouts        timeouts.Value `tfsdk:"timeouts" json:"-"`
+	ResourceVersion types.String   `tfsdk:"resource_version" json:"-"`
+
+	Spec   *K8sSpec   `tfsdk:"spec" json:"spec,omitempty"`
+	Status *K8sStatus `tfsdk:"status" json:"status"`
 }
 
 type K8sSpec struct {
-	Prefix string `json:"prefix,omitempty"`
+	Prefix string `tfsdk:"prefix" json:"prefix,omitempty"`
+
+	Arrobj []struct {
+		Arrprop1 string `tfsdk:"arrprop1" json:"arrprop1"`
+		Arrprop2 string `tfsdk:"arrprop2" json:"arrprop2"`
+	} `tfsdk:"arrobj" json:"arrobj"`
+
+	Arrstr []string `tfsdk:"arrstr" json:"arrstr"`
+
+	Mapobj map[string]struct {
+		Objprop2 string `tfsdk:"objprop2" json:"objprop2"`
+		Objprop1 string `tfsdk:"objprop1" json:"objprop1"`
+	} `tfsdk:"mapobj" json:"mapobj"`
+
+	Mapstr map[string]string `tfsdk:"mapstr" json:"mapstr"`
+
+	Strobj *struct {
+		Prop1 string `tfsdk:"prop1" json:"prop1"`
+		Prop2 string `tfsdk:"prop2" json:"prop2"`
+	} `tfsdk:"strobj" json:"strobj"`
 }
 
 type K8sStatus struct {
-	Arn *string `json:"arn"`
+	Arn *string `tfsdk:"arn" json:"arn"`
 
 	Conditions *[]struct {
-		Type   *string `json:"type"`
-		Status *string `json:"status"`
-	} `json:"conditions"`
+		Type   *string `tfsdk:"-" json:"type"`
+		Status *string `tfsdk:"-" json:"status"`
+	} `tfsdk:"-" json:"conditions"`
 }

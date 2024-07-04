@@ -1,17 +1,21 @@
 package {{ .PackageName }}
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const k8sApiVersion = "{{ .CrdApiVersion }}"
-
 type K8sCR struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `tfsdk:"-" json:",inline"`
+	Metadata        metav1.ObjectMeta `tfsdk:"-" json:"metadata,omitempty"`
 
-	Spec   K8sSpec   `json:"spec,omitempty"`
-	Status K8sStatus `json:"status"`
+	Name            types.String   `tfsdk:"name" json:"-"`
+	Timeouts        timeouts.Value `tfsdk:"timeouts" json:"-"`
+	ResourceVersion types.String   `tfsdk:"resource_version" json:"-"`
+
+	Spec   *K8sSpec   `tfsdk:"spec" json:"spec,omitempty"`
+	Status *K8sStatus `tfsdk:"status" json:"status"`
 }
 
 type K8sSpec struct {
@@ -21,12 +25,12 @@ type K8sSpec struct {
 }
 
 type K8sStatus struct {
-    {{- range .StatusProperties }}
+	{{- range .StatusProperties }}
 	{{ template "crd_property.go.tmpl" . }}
 	{{ end -}}
 
 	Conditions *[]struct {
-		Type   *string `json:"type"`
-		Status *string `json:"status"`
-	} `json:"conditions"`
+		Type   *string `tfsdk:"-" json:"type"`
+		Status *string `tfsdk:"-" json:"status"`
+	} `tfsdk:"-" json:"conditions"`
 }
