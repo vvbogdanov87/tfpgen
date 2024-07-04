@@ -14,31 +14,29 @@ import (
 )
 
 type Data struct {
-	Group            string
-	Version          string
-	Resource         string
-	Kind             string
-	ResourceName     string
-	PackageName      string
-	CrdApiVersion    string
+	Group        string
+	Version      string
+	Resource     string
+	Kind         string
+	ResourceName string
+	PackageName  string
+	// CrdApiVersion    string
 	SpecProperties   []*Property
 	StatusProperties []*Property
 }
 
 type Property struct {
-	Name           string
-	Description    string
-	FieldName      string
-	Type           string
-	TFType         string
-	ArgumentType   string
-	ElementType    string
-	Required       bool
-	Optional       bool
-	Computed       bool
-	Immutable      bool
-	GetValueMethod string
-	Properties     []*Property
+	Name         string
+	Description  string
+	FieldName    string
+	Type         string
+	ArgumentType string
+	ElementType  string
+	Required     bool
+	Optional     bool
+	Computed     bool
+	Immutable    bool
+	Properties   []*Property
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -112,13 +110,13 @@ func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
 	}
 
 	return &Data{
-		Kind:             kind,
-		Group:            group,
-		Resource:         crd.Spec.Names.Plural,
-		Version:          version.Name,
-		ResourceName:     resourceName,
-		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + resourceName + "_" + strings.ToLower(version.Name),
-		CrdApiVersion:    group + "/" + version.Name,
+		Kind:         kind,
+		Group:        group,
+		Resource:     crd.Spec.Names.Plural,
+		Version:      version.Name,
+		ResourceName: resourceName,
+		PackageName:  strings.Replace(group, ".", "_", -1) + "_" + resourceName + "_" + strings.ToLower(version.Name),
+		// CrdApiVersion:    group + "/" + version.Name,
 		SpecProperties:   crdProperties(&spec, false),
 		StatusProperties: crdProperties(&status, true),
 	}
@@ -130,50 +128,40 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 	for name, sProp := range schema.Properties {
 		// Compute types based on the schema type
 		var typeName string
-		var tfTypeName string
+		// var tfTypeName string
 		var argumentTypeName string
 		var elementTypeName string
-		var getValueMethod string
-		getValueMethod = "Value" + capitalizer.String(typeName) + "()"
 
 		var nestedProperties []*Property
 
 		switch sProp.Type {
 		case "string":
 			typeName = "string"
-			tfTypeName = "types.String"
 			argumentTypeName = "schema.StringAttribute"
-			getValueMethod = "ValueString()"
 		case "object":
 			// AdditionalProperties and Properties are mutually exclusive
 			if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
 				if sProp.AdditionalProperties.Schema.Type == "object" { // map[string]struct
 					typeName = "map"
-					tfTypeName = "types.Map"
 					argumentTypeName = "schema.MapNestedAttribute"
 					nestedProperties = crdProperties(sProp.AdditionalProperties.Schema, computed)
 				} else { // map[string]primitive
 					typeName = "map[string]" + sProp.AdditionalProperties.Schema.Type
-					tfTypeName = "types.Map"
 					argumentTypeName = "schema.MapAttribute"
 					elementTypeName = "types." + capitalizer.String(sProp.AdditionalProperties.Schema.Type) + "Type"
-					getValueMethod = "Elements()"
 				}
 			} else if len(sProp.Properties) > 0 { // object with Properties is a struct
 				typeName = "struct"
-				tfTypeName = "types.Object"
 				argumentTypeName = "schema.SingleNestedAttribute"
 				nestedProperties = crdProperties(&sProp, computed)
 			}
 		case "array":
 			if sProp.Items.Schema.Type == "object" { // array of struct
 				typeName = "array"
-				tfTypeName = "types.List"
 				argumentTypeName = "schema.ListNestedAttribute"
 				nestedProperties = crdProperties(sProp.Items.Schema, computed)
 			} else { // array of primitive
 				typeName = "[]" + sProp.Items.Schema.Type
-				tfTypeName = "types.List"
 				argumentTypeName = "schema.ListAttribute"
 				elementTypeName = "types." + capitalizer.String(sProp.Items.Schema.Type) + "Type"
 			}
@@ -190,17 +178,15 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 		}
 
 		prop := &Property{
-			Name:           name,
-			Description:    description,
-			FieldName:      capitalizer.String(name),
-			Type:           typeName,
-			TFType:         tfTypeName,
-			ArgumentType:   argumentTypeName,
-			ElementType:    elementTypeName,
-			Computed:       computed,
-			Immutable:      immutable,
-			GetValueMethod: getValueMethod,
-			Properties:     nestedProperties,
+			Name:         name,
+			Description:  description,
+			FieldName:    capitalizer.String(name),
+			Type:         typeName,
+			ArgumentType: argumentTypeName,
+			ElementType:  elementTypeName,
+			Computed:     computed,
+			Immutable:    immutable,
+			Properties:   nestedProperties,
 		}
 
 		properties = append(properties, prop)

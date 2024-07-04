@@ -84,62 +84,6 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 				Description: "Spec is the specification of a resource.",
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
-					"prefix": schema.StringAttribute{
-						Required:    true,
-						Optional:    false,
-						Computed:    false,
-						Description: "(immutable) The prefix to use for the bucket name",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"arrobj": schema.ListNestedAttribute{
-						Required: false,
-						Optional: true,
-						Computed: false,
-
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"arrprop1": schema.StringAttribute{
-									Required: false,
-									Optional: true,
-									Computed: false,
-								},
-								"arrprop2": schema.StringAttribute{
-									Required: false,
-									Optional: true,
-									Computed: false,
-								},
-							},
-						},
-					},
-					"arrstr": schema.ListAttribute{
-						Required: false,
-						Optional: true,
-						Computed: false,
-
-						ElementType: types.StringType,
-					},
-					"mapobj": schema.MapNestedAttribute{
-						Required: false,
-						Optional: true,
-						Computed: false,
-
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"objprop2": schema.StringAttribute{
-									Required: false,
-									Optional: true,
-									Computed: false,
-								},
-								"objprop1": schema.StringAttribute{
-									Required: false,
-									Optional: true,
-									Computed: false,
-								},
-							},
-						},
-					},
 					"mapstr": schema.MapAttribute{
 						Required: false,
 						Optional: true,
@@ -163,6 +107,62 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 								Optional: true,
 								Computed: false,
 							},
+						},
+					},
+					"arrobj": schema.ListNestedAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"arrprop1": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+								"arrprop2": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+							},
+						},
+					},
+					"mapobj": schema.MapNestedAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"objprop1": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+								"objprop2": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+							},
+						},
+					},
+					"arrstr": schema.ListAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						ElementType: types.StringType,
+					},
+					"prefix": schema.StringAttribute{
+						Required:    true,
+						Optional:    false,
+						Computed:    false,
+						Description: "(immutable) The prefix to use for the bucket name",
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
 						},
 					},
 				},

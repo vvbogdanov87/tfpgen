@@ -12,24 +12,22 @@ import (
 var logger = slog.Default()
 
 func main() {
-	// logger := slog.Default()
-
 	// TODO: handle working directory when started from a different locations (e.g. vscode debug vs make generate)
 	cwd, err := os.Getwd()
 	if err != nil {
-		logger.Error("get working directory: ", err)
+		logger.Error("get working directory", "error", err)
 		os.Exit(1)
 	}
 
 	packages, err := generateResources(cwd)
 	if err != nil {
-		logger.Error("generate resources: ", err)
+		logger.Error("generate resources", "error", err)
 		os.Exit(1)
 	}
 
 	err = generateProviderResources(cwd, packages)
 	if err != nil {
-		logger.Error("generate provider resources method: ", err)
+		logger.Error("generate provider resources method", "error", err)
 		os.Exit(1)
 	}
 }
