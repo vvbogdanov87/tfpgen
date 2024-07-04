@@ -1,4 +1,4 @@
-module github.com/vvbogdanov87/terraform-provider-crd
+module github.com/vvbogdanov87/tfpgen
 
 go 1.22.2
 

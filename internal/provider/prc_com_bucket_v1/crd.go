@@ -19,6 +19,13 @@ type K8sCR struct {
 }
 
 type K8sSpec struct {
+	Prefix string `tfsdk:"prefix" json:"prefix,omitempty"`
+
+	Mapobj map[string]struct {
+		Objprop1 string `tfsdk:"objprop1" json:"objprop1"`
+		Objprop2 string `tfsdk:"objprop2" json:"objprop2"`
+	} `tfsdk:"mapobj" json:"mapobj"`
+
 	Mapstr map[string]string `tfsdk:"mapstr" json:"mapstr"`
 
 	Strobj *struct {
@@ -31,14 +38,7 @@ type K8sSpec struct {
 		Arrprop2 string `tfsdk:"arrprop2" json:"arrprop2"`
 	} `tfsdk:"arrobj" json:"arrobj"`
 
-	Mapobj map[string]struct {
-		Objprop1 string `tfsdk:"objprop1" json:"objprop1"`
-		Objprop2 string `tfsdk:"objprop2" json:"objprop2"`
-	} `tfsdk:"mapobj" json:"mapobj"`
-
 	Arrstr []string `tfsdk:"arrstr" json:"arrstr"`
-
-	Prefix string `tfsdk:"prefix" json:"prefix,omitempty"`
 }
 
 type K8sStatus struct {

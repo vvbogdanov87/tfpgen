@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
-	"github.com/vvbogdanov87/terraform-provider-crd/internal/provider/common"
+	"github.com/vvbogdanov87/tfpgen/internal/provider/common"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -84,6 +84,35 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 				Description: "Spec is the specification of a resource.",
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
+					"prefix": schema.StringAttribute{
+						Required:    true,
+						Optional:    false,
+						Computed:    false,
+						Description: "(immutable) The prefix to use for the bucket name",
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
+					},
+					"mapobj": schema.MapNestedAttribute{
+						Required: false,
+						Optional: true,
+						Computed: false,
+
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"objprop1": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+								"objprop2": schema.StringAttribute{
+									Required: false,
+									Optional: true,
+									Computed: false,
+								},
+							},
+						},
+					},
 					"mapstr": schema.MapAttribute{
 						Required: false,
 						Optional: true,
@@ -129,41 +158,12 @@ func (r *tfResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp 
 							},
 						},
 					},
-					"mapobj": schema.MapNestedAttribute{
-						Required: false,
-						Optional: true,
-						Computed: false,
-
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"objprop1": schema.StringAttribute{
-									Required: false,
-									Optional: true,
-									Computed: false,
-								},
-								"objprop2": schema.StringAttribute{
-									Required: false,
-									Optional: true,
-									Computed: false,
-								},
-							},
-						},
-					},
 					"arrstr": schema.ListAttribute{
 						Required: false,
 						Optional: true,
 						Computed: false,
 
 						ElementType: types.StringType,
-					},
-					"prefix": schema.StringAttribute{
-						Required:    true,
-						Optional:    false,
-						Computed:    false,
-						Description: "(immutable) The prefix to use for the bucket name",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
 					},
 				},
 			},
