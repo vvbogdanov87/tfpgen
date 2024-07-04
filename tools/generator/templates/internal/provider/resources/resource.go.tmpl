@@ -379,8 +379,8 @@ func (r *tfResource) modelToCR(model *resourceModel) *K8sCR {
 		},
 		Spec: K8sSpec{
 			{{- range .SpecProperties }}
-			{{ .FieldName }}: model.{{ .FieldName }}.{{ .GetValueMethod }},
-			{{- end }}
+			{{ template "model_to_cr_field.go.tmpl" . }}
+			{{ end -}}
 		},
 	}
 }

@@ -13,6 +13,14 @@ Computed: {{ .Computed }},
 		{{ template "schema_attribute.go.tmpl" . }}
 	{{ end -}}
 	},
+{{ else if eq .Type "map" -}}
+    NestedObject: schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+		{{ range .Properties -}}
+			{{ template "schema_attribute.go.tmpl" . }}
+		{{ end -}}
+		},
+	},
 {{ else if eq .Type "array" -}}
 	NestedObject: schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{

@@ -133,6 +133,8 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 		var tfTypeName string
 		var argumentTypeName string
 		var elementTypeName string
+		var getValueMethod string
+		getValueMethod = "Value" + capitalizer.String(typeName) + "()"
 
 		var nestedProperties []*Property
 
@@ -141,6 +143,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 			typeName = "string"
 			tfTypeName = "types.String"
 			argumentTypeName = "schema.StringAttribute"
+			getValueMethod = "ValueString()"
 		case "object":
 			// AdditionalProperties and Properties are mutually exclusive
 			if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
@@ -154,6 +157,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 					tfTypeName = "types.Map"
 					argumentTypeName = "schema.MapAttribute"
 					elementTypeName = "types." + capitalizer.String(sProp.AdditionalProperties.Schema.Type) + "Type"
+					getValueMethod = "Elements()"
 				}
 			} else if len(sProp.Properties) > 0 { // object with Properties is a struct
 				typeName = "struct"
@@ -195,7 +199,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 			ElementType:    elementTypeName,
 			Computed:       computed,
 			Immutable:      immutable,
-			GetValueMethod: "Value" + capitalizer.String(typeName) + "()",
+			GetValueMethod: getValueMethod,
 			Properties:     nestedProperties,
 		}
 

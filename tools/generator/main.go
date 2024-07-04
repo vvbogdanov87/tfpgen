@@ -41,11 +41,11 @@ func generateResources(cwd string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get crd template: %w", err)
 	}
-	modelTmpl, err := getTemplate(cwd, resourcesPath, "model.go.tmpl")
+	modelTmpl, err := getTemplate(cwd, resourcesPath, "model.go.tmpl", "model_property.go.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("get model template: %w", err)
 	}
-	resourceTmpl, err := getTemplate(cwd, resourcesPath, "resource.go.tmpl", "schema_attribute.go.tmpl")
+	resourceTmpl, err := getTemplate(cwd, resourcesPath, "resource.go.tmpl", "schema_attribute.go.tmpl", "model_to_cr_field.go.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("get resource template: %w", err)
 	}

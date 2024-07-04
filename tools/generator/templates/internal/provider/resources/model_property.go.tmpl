@@ -1,0 +1,15 @@
+{{ if eq .Type "struct" -}}
+    {{ .FieldName }} *struct {
+    {{- range .Properties }}{{ template "model_property.go.tmpl" . }}{{ end -}}
+    } `tfsdk:"{{ .Name }}"`
+{{ else if eq .Type "map" -}}
+    {{ .FieldName }} map[string]struct {
+    {{- range .Properties }}{{ template "model_property.go.tmpl" . }}{{ end -}}
+    } `tfsdk:"{{ .Name }}"`
+{{ else if eq .Type "array" -}}
+    {{ .FieldName }} []struct {
+    {{- range .Properties }}{{ template "model_property.go.tmpl" . }}{{ end -}}
+    } `tfsdk:"{{ .Name }}"`
+{{ else -}}
+{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .Name }}"`
+{{ end -}}

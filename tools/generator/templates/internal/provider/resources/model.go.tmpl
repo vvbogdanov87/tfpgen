@@ -11,8 +11,9 @@ type resourceModel struct {
 	ResourceVersion types.String   `tfsdk:"resource_version"`
 
 	{{- range .SpecProperties }}
-	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .Name }}"`{{ end }}
-
+	{{ template "model_property.go.tmpl" . }}
+	{{ end -}}
 	{{- range .StatusProperties }}
-	{{ .FieldName }} {{ .TFType }} `tfsdk:"{{ .Name }}"`{{ end }}
+	{{ template "model_property.go.tmpl" . }}
+	{{ end -}}
 }
