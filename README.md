@@ -1,4 +1,6 @@
-# terraform-provider-crd
+# tfpgen
+
+This project aims to provide a Terraform provider for managing Custom Resource Definitions (CRDs) in Kubernetes. The `tfpgen` tool generates the necessary provider code based on the CRD schemas provided. This provider allows users to easily create, update, and delete CRDs using Terraform. The generated provider code can be installed and used locally or published to the Terraform registry.
 
 ## Usage
 - Create a repository (the repository address is used as the Go module name)
@@ -39,6 +41,8 @@
             "registry.terraform.io/vvbogdanov87/crd" = "/home/viktor/go/bin"
         }
         direct {}
-        }
-
+    }
     ```
+
+## Acknowledgements
+`tfpgen` is inspired by [terraform-provider-k8s](https://github.com/metio/terraform-provider-k8s)
