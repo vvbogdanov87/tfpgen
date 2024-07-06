@@ -14,13 +14,13 @@ import (
 )
 
 type Data struct {
-	Group        string
-	Version      string
-	Resource     string
-	Kind         string
-	ResourceName string
-	PackageName  string
-	// CrdApiVersion    string
+	Group            string
+	Version          string
+	Resource         string
+	Kind             string
+	ResourceName     string
+	PackageName      string
+	ModuleName       string
 	SpecProperties   []*Property
 	StatusProperties []*Property
 }

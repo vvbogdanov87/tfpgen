@@ -14,6 +14,8 @@ type Config struct {
 	Name string `yaml:"name"`
 	// Address is the provider address for the Terraform registry.
 	Address string `yaml:"address"`
+	// ModuleName is the name of the Go module.
+	ModuleName string `yaml:"moduleName"`
 	// SchemasDir is the directory containing the CRD schemas.
 	SchemasDir string `yaml:"schemasDir"`
 	// OutputDir is the directory to write the generated provider code.

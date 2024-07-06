@@ -23,6 +23,15 @@ var resourceTmplates embed.FS
 //go:embed templates/resources.go.tmpl
 var resourcesTemplate embed.FS
 
+//go:embed templates/main.go.tmpl
+var mainTemplate embed.FS
+
+//go:embed templates/provider.go.tmpl
+var providerTemplate embed.FS
+
+//go:embed templates/resource_data.go.tmpl
+var resourceDataTemplate embed.FS
+
 type Generator struct {
 	config *config.Config
 }
@@ -42,6 +51,21 @@ func (g *Generator) Generate(config *config.Config) error {
 	err = g.generateProviderResources(packages)
 	if err != nil {
 		return fmt.Errorf("generate provider resources method: %w", err)
+	}
+
+	err = g.generateMain()
+	if err != nil {
+		return fmt.Errorf("generate main: %w", err)
+	}
+
+	err = g.generateProvider()
+	if err != nil {
+		return fmt.Errorf("generate provider: %w", err)
+	}
+
+	err = g.generateResourceData()
+	if err != nil {
+		return fmt.Errorf("generate resource data: %w", err)
 	}
 
 	return nil
@@ -76,12 +100,9 @@ func (g *Generator) generateResources() ([]string, error) {
 		if err != nil {
 			return fmt.Errorf("parse schema: %w", err)
 		}
+		data.ModuleName = g.config.ModuleName
 
 		outDir := filepath.Join(g.config.OutputDir, "/internal/provider", data.PackageName)
-		err = os.MkdirAll(outDir, os.ModePerm)
-		if err != nil {
-			return fmt.Errorf("create output directory: %w", err)
-		}
 
 		err = generateCode(crdTmpl, data, outDir, "crd.go")
 		if err != nil {
@@ -112,7 +133,15 @@ func (g *Generator) generateProviderResources(packages []string) error {
 
 	outDir := filepath.Join(g.config.OutputDir, "internal/provider")
 
-	err = generateCode(tmpl, packages, outDir, "resources.go")
+	data := struct {
+		Packages   []string
+		ModuleName string
+	}{
+		Packages:   packages,
+		ModuleName: g.config.ModuleName,
+	}
+
+	err = generateCode(tmpl, data, outDir, "resources.go")
 	if err != nil {
 		return fmt.Errorf("generate provider resources method code: %w", err)
 	}
@@ -120,10 +149,63 @@ func (g *Generator) generateProviderResources(packages []string) error {
 	return nil
 }
 
+func (g *Generator) generateMain() error {
+	tmpl, err := template.ParseFS(mainTemplate, "templates/main.go.tmpl")
+	if err != nil {
+		return fmt.Errorf("get main template: %w", err)
+	}
+
+	outDir := g.config.OutputDir
+
+	err = generateCode(tmpl, g.config, outDir, "main.go")
+	if err != nil {
+		return fmt.Errorf("generate main code: %w", err)
+	}
+
+	return nil
+}
+
+func (g *Generator) generateProvider() error {
+	tmpl, err := template.ParseFS(providerTemplate, "templates/provider.go.tmpl")
+	if err != nil {
+		return fmt.Errorf("get provider template: %w", err)
+	}
+
+	outDir := filepath.Join(g.config.OutputDir, "internal/provider")
+
+	err = generateCode(tmpl, g.config, outDir, "provider.go")
+	if err != nil {
+		return fmt.Errorf("generate provider code: %w", err)
+	}
+
+	return nil
+}
+
+func (g *Generator) generateResourceData() error {
+	tmpl, err := template.ParseFS(resourceDataTemplate, "templates/resource_data.go.tmpl")
+	if err != nil {
+		return fmt.Errorf("get resource data template: %w", err)
+	}
+
+	outDir := filepath.Join(g.config.OutputDir, "internal/provider/common")
+
+	err = generateCode(tmpl, nil, outDir, "resource_data.go")
+	if err != nil {
+		return fmt.Errorf("generate resource data code: %w", err)
+	}
+
+	return nil
+}
+
 func generateCode(tmpl *template.Template, data any, outDir, outFileName string) error {
+	err := os.MkdirAll(outDir, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("create output directory: %w", err)
+	}
+
 	outFilePath := filepath.Join(outDir, outFileName)
 
-	err := executeTemplate(outFilePath, tmpl, data)
+	err = executeTemplate(outFilePath, tmpl, data)
 	if err != nil {
 		return fmt.Errorf("generate code: %w", err)
 	}
