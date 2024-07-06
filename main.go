@@ -10,8 +10,6 @@ import (
 	"github.com/vvbogdanov87/tfpgen/pkg/generator"
 )
 
-var logger = slog.Default()
-
 func main() {
 	app := &cli.App{
 		Name:  "tfpgen",
@@ -26,10 +24,12 @@ func main() {
 		},
 
 		Action: func(cCtx *cli.Context) error {
-			config, err := config.ReadConfig(cCtx.String("config"))
+			config, err := config.NewConfig(cCtx.String("config"))
 			if err != nil {
 				return fmt.Errorf("read tfpgen config: %w", err)
 			}
+
+			generator := generator.NewGenerator(config)
 
 			err = generator.Generate(config)
 			if err != nil {
@@ -41,7 +41,7 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		logger.Error("run app", "error", err)
+		slog.Error("run app", "error", err)
 		os.Exit(1)
 	}
 }

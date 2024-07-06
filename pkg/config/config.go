@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
@@ -17,9 +18,13 @@ type Config struct {
 	SchemasDir string `yaml:"schemasDir"`
 	// OutputDir is the directory to write the generated provider code.
 	OutputDir string `yaml:"outputDir"`
+
+	// The directory of the configuration file.
+	// All paths in the configuration file are relative to this directory.
+	baseDir string
 }
 
-func ReadConfig(filename string) (*Config, error) {
+func NewConfig(filename string) (*Config, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filename, err)
@@ -38,5 +43,27 @@ func ReadConfig(filename string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal yaml from file %s: %w", filename, err)
 	}
 
+	err = config.setDefaults(filepath.Dir(filename))
+	if err != nil {
+		return nil, fmt.Errorf("failed to set defaults: %w", err)
+	}
+
 	return config, nil
+}
+
+func (c *Config) setDefaults(baseDir string) error {
+	if filepath.IsAbs(baseDir) {
+		c.baseDir = baseDir
+	} else {
+		baseDir, err := filepath.Abs(baseDir)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+		c.baseDir = baseDir
+	}
+
+	c.SchemasDir = filepath.Join(c.baseDir, c.SchemasDir)
+	c.OutputDir = filepath.Join(c.baseDir, c.OutputDir)
+
+	return nil
 }

@@ -1,8 +1,10 @@
 package generator
 
 import (
+	"embed"
 	"fmt"
 	"go/format"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -10,19 +12,34 @@ import (
 	"github.com/vvbogdanov87/tfpgen/pkg/config"
 )
 
-func Generate(config *config.Config) error {
-	// TODO: handle working directory when started from a different locations (e.g. vscode debug vs make generate)
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
+//go:embed templates/crd.go.tmpl
+//go:embed templates/crd_property.go.tmpl
+var crdTemplates embed.FS
 
-	packages, err := generateResources(cwd)
+//go:embed templates/resource.go.tmpl
+//go:embed templates/schema_attribute.go.tmpl
+var resourceTmplates embed.FS
+
+//go:embed templates/resources.go.tmpl
+var resourcesTemplate embed.FS
+
+type Generator struct {
+	config *config.Config
+}
+
+func NewGenerator(config *config.Config) *Generator {
+	return &Generator{
+		config: config,
+	}
+}
+
+func (g *Generator) Generate(config *config.Config) error {
+	packages, err := g.generateResources()
 	if err != nil {
 		return fmt.Errorf("generate resources: %w", err)
 	}
 
-	err = generateProviderResources(cwd, packages)
+	err = g.generateProviderResources(packages)
 	if err != nil {
 		return fmt.Errorf("generate provider resources method: %w", err)
 	}
@@ -30,15 +47,13 @@ func Generate(config *config.Config) error {
 	return nil
 }
 
-func generateResources(cwd string) ([]string, error) {
-	resourcesPath := "internal/provider/resources"
-
-	crdTmpl, err := getTemplate(cwd, resourcesPath, "crd.go.tmpl", "crd_property.go.tmpl")
+func (g *Generator) generateResources() ([]string, error) {
+	crdTmpl, err := template.ParseFS(crdTemplates, "templates/crd.go.tmpl", "templates/crd_property.go.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("get crd template: %w", err)
 	}
 
-	resourceTmpl, err := getTemplate(cwd, resourcesPath, "resource.go.tmpl", "schema_attribute.go.tmpl")
+	resourceTmpl, err := template.ParseFS(resourceTmplates, "templates/resource.go.tmpl", "templates/schema_attribute.go.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("get resource template: %w", err)
 	}
@@ -46,8 +61,7 @@ func generateResources(cwd string) ([]string, error) {
 	var packages []string
 
 	// generate code for each schema from each template
-	schemasDir := filepath.Join(cwd, "../../schemas")
-	err = filepath.WalkDir(schemasDir, func(schemaPath string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(g.config.SchemasDir, func(schemaPath string, d os.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("walk schemas directory: %w", err)
 		}
@@ -56,14 +70,14 @@ func generateResources(cwd string) ([]string, error) {
 			return nil
 		}
 
-		logger.Info("generating code for schema", "path", schemaPath)
+		slog.Info("generating code for schema", "path", schemaPath)
 
 		data, err := parseSchema(schemaPath)
 		if err != nil {
 			return fmt.Errorf("parse schema: %w", err)
 		}
 
-		outDir := filepath.Join(cwd, "../../internal/provider", data.PackageName)
+		outDir := filepath.Join(g.config.OutputDir, "/internal/provider", data.PackageName)
 		err = os.MkdirAll(outDir, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("create output directory: %w", err)
@@ -90,13 +104,13 @@ func generateResources(cwd string) ([]string, error) {
 	return packages, nil
 }
 
-func generateProviderResources(cwd string, packages []string) error {
-	tmpl, err := getTemplate(cwd, "internal/provider", "resources.go.tmpl")
+func (g *Generator) generateProviderResources(packages []string) error {
+	tmpl, err := template.ParseFS(resourcesTemplate, "templates/resources.go.tmpl")
 	if err != nil {
-		return fmt.Errorf("get crd template: %w", err)
+		return fmt.Errorf("get provider resources template: %w", err)
 	}
 
-	outDir := filepath.Join(cwd, "../../internal/provider")
+	outDir := filepath.Join(g.config.OutputDir, "internal/provider")
 
 	err = generateCode(tmpl, packages, outDir, "resources.go")
 	if err != nil {
@@ -104,14 +118,6 @@ func generateProviderResources(cwd string, packages []string) error {
 	}
 
 	return nil
-}
-
-func getTemplate(cwd, tmplPath string, tmplNames ...string) (*template.Template, error) {
-	var tmplFilePaths []string
-	for _, name := range tmplNames {
-		tmplFilePaths = append(tmplFilePaths, filepath.Join(cwd, "templates", tmplPath, name))
-	}
-	return template.New(tmplNames[0]).ParseFiles(tmplFilePaths...)
 }
 
 func generateCode(tmpl *template.Template, data any, outDir, outFileName string) error {
