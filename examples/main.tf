@@ -14,6 +14,9 @@ resource "crd_bucket" "example" {
   name = "testbckt"
   spec = {
     prefix = "asd"
+    int_prop = 42
+    num_prop = 3.14
+    bool_prop = true
     mapstr = {
       "key1" = "value1"
       "key2" = "value2"

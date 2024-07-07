@@ -27,6 +27,15 @@ spec:
                 description: "(immutable) The prefix to use for the bucket name"
                 x-kubernetes-validations:
                 - rule: self == oldSelf
+              intProp:
+                type: integer
+                description: "An integer property"
+              numProp:
+                type: number
+                description: "A number property"
+              boolProp:
+                type: boolean
+                description: "A boolean property"
               mapstr:
                 type: object
                 additionalProperties:

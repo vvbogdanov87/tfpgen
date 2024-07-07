@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
+	"sort"
 	"strings"
 
 	"golang.org/x/text/cases"
@@ -27,6 +29,7 @@ type Data struct {
 
 type Property struct {
 	Name         string
+	TFName       string // Terraform argument name is snake case
 	Description  string
 	FieldName    string
 	Type         string
@@ -110,13 +113,12 @@ func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
 	}
 
 	return &Data{
-		Kind:         kind,
-		Group:        group,
-		Resource:     crd.Spec.Names.Plural,
-		Version:      version.Name,
-		ResourceName: resourceName,
-		PackageName:  strings.Replace(group, ".", "_", -1) + "_" + resourceName + "_" + strings.ToLower(version.Name),
-		// CrdApiVersion:    group + "/" + version.Name,
+		Kind:             kind,
+		Group:            group,
+		Resource:         crd.Spec.Names.Plural,
+		Version:          version.Name,
+		ResourceName:     resourceName,
+		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + resourceName + "_" + strings.ToLower(version.Name),
 		SpecProperties:   crdProperties(&spec, false),
 		StatusProperties: crdProperties(&status, true),
 	}
@@ -138,6 +140,15 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 		case "string":
 			typeName = "string"
 			argumentTypeName = "schema.StringAttribute"
+		case "integer":
+			typeName = "int64"
+			argumentTypeName = "schema.Int64Attribute"
+		case "number":
+			typeName = "float64"
+			argumentTypeName = "schema.Float64Attribute"
+		case "boolean":
+			typeName = "bool"
+			argumentTypeName = "schema.BoolAttribute"
 		case "object":
 			// AdditionalProperties and Properties are mutually exclusive
 			if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
@@ -179,6 +190,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 
 		prop := &Property{
 			Name:         name,
+			TFName:       toSnakeCase(name),
 			Description:  description,
 			FieldName:    capitalizer.String(name),
 			Type:         typeName,
@@ -203,5 +215,20 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 		}
 	}
 
+	// Sort properties by name
+	// This is important for the generated code to be deterministic
+	sort.SliceStable(properties, func(i, j int) bool {
+		return properties[i].Name < properties[j].Name
+	})
+
 	return properties
+}
+
+var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+
+func toSnakeCase(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
 }
