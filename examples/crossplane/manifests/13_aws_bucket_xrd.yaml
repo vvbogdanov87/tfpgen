@@ -22,6 +22,7 @@ spec:
           spec:
             type: object
             properties:
+              # test prmitive types
               prefix:
                 type: string
                 description: "(immutable) The prefix to use for the bucket name"
@@ -36,10 +37,26 @@ spec:
               boolProp:
                 type: boolean
                 description: "A boolean property"
-              mapstr:
+              # test map[string]primitive types
+              mapStr:
                 type: object
                 additionalProperties:
                   type: string
+                x-kubernetes-map-type: atomic
+              mapInt:
+                type: object
+                additionalProperties:
+                  type: integer
+                x-kubernetes-map-type: atomic
+              mapNum:
+                type: object
+                additionalProperties:
+                  type: number
+                x-kubernetes-map-type: atomic
+              mapBool:
+                type: object
+                additionalProperties:
+                  type: boolean
                 x-kubernetes-map-type: atomic
               mapobj:
                 type: object

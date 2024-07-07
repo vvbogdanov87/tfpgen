@@ -131,50 +131,65 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 		// Compute types based on the schema type
 		var typeName string
 		// var tfTypeName string
-		var argumentTypeName string
-		var elementTypeName string
+		var argumentType string
+		var elementType string
 
 		var nestedProperties []*Property
 
 		switch sProp.Type {
 		case "string":
 			typeName = "string"
-			argumentTypeName = "schema.StringAttribute"
+			argumentType = "schema.StringAttribute"
 		case "integer":
 			typeName = "int64"
-			argumentTypeName = "schema.Int64Attribute"
+			argumentType = "schema.Int64Attribute"
 		case "number":
 			typeName = "float64"
-			argumentTypeName = "schema.Float64Attribute"
+			argumentType = "schema.Float64Attribute"
 		case "boolean":
 			typeName = "bool"
-			argumentTypeName = "schema.BoolAttribute"
+			argumentType = "schema.BoolAttribute"
 		case "object":
 			// AdditionalProperties and Properties are mutually exclusive
 			if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
 				if sProp.AdditionalProperties.Schema.Type == "object" { // map[string]struct
 					typeName = "map"
-					argumentTypeName = "schema.MapNestedAttribute"
+					argumentType = "schema.MapNestedAttribute"
 					nestedProperties = crdProperties(sProp.AdditionalProperties.Schema, computed)
 				} else { // map[string]primitive
-					typeName = "map[string]" + sProp.AdditionalProperties.Schema.Type
-					argumentTypeName = "schema.MapAttribute"
-					elementTypeName = "types." + capitalizer.String(sProp.AdditionalProperties.Schema.Type) + "Type"
+					argumentType = "schema.MapAttribute"
+
+					typeName = "map[string]"
+					elementType = "types."
+					switch sProp.AdditionalProperties.Schema.Type {
+					case "string":
+						typeName += "string"
+						elementType += "StringType"
+					case "integer":
+						typeName += "int64"
+						elementType += "Int64Type"
+					case "number":
+						typeName += "float64"
+						elementType += "Float64Type"
+					case "boolean":
+						typeName += "bool"
+						elementType += "BoolType"
+					}
 				}
 			} else if len(sProp.Properties) > 0 { // object with Properties is a struct
 				typeName = "struct"
-				argumentTypeName = "schema.SingleNestedAttribute"
+				argumentType = "schema.SingleNestedAttribute"
 				nestedProperties = crdProperties(&sProp, computed)
 			}
 		case "array":
 			if sProp.Items.Schema.Type == "object" { // array of struct
 				typeName = "array"
-				argumentTypeName = "schema.ListNestedAttribute"
+				argumentType = "schema.ListNestedAttribute"
 				nestedProperties = crdProperties(sProp.Items.Schema, computed)
 			} else { // array of primitive
 				typeName = "[]" + sProp.Items.Schema.Type
-				argumentTypeName = "schema.ListAttribute"
-				elementTypeName = "types." + capitalizer.String(sProp.Items.Schema.Type) + "Type"
+				argumentType = "schema.ListAttribute"
+				elementType = "types." + capitalizer.String(sProp.Items.Schema.Type) + "Type"
 			}
 		}
 		if computed {
@@ -185,8 +200,9 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 		immutable := false
 		if strings.HasPrefix(description, "(immutable)") {
 			immutable = true
-			description = strings.TrimPrefix(description, "#immutable#")
+			description = strings.TrimPrefix(description, "(immutable)")
 		}
+		description = strings.TrimSpace(description)
 
 		prop := &Property{
 			Name:         name,
@@ -194,8 +210,8 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 			Description:  description,
 			FieldName:    capitalizer.String(name),
 			Type:         typeName,
-			ArgumentType: argumentTypeName,
-			ElementType:  elementTypeName,
+			ArgumentType: argumentType,
+			ElementType:  elementType,
 			Computed:     computed,
 			Immutable:    immutable,
 			Properties:   nestedProperties,

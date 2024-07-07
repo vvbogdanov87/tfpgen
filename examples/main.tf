@@ -13,14 +13,29 @@ provider "crd" {
 resource "crd_bucket" "example" {
   name = "testbckt"
   spec = {
+    # test primitive types
     prefix = "asd"
     int_prop = 42
     num_prop = 3.14
     bool_prop = true
-    mapstr = {
+    # test map[string]primitive types
+    map_str = {
       "key1" = "value1"
       "key2" = "value2"
     }
+    map_int = {
+      "key1" = 1
+      "key2" = 2
+    }
+    map_num = {
+      "key1" = 1.1
+      "key2" = 2.2
+    }
+    map_bool = {
+      "key1" = true
+      "key2" = false
+    }
+
     mapobj = {
       "key1" = {
         "objprop1" = "value1"

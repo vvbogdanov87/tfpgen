@@ -44,5 +44,54 @@ This project aims to provide a Terraform provider for managing Custom Resource D
     }
     ```
 
+## CRD properties and TF attributes
+CRD camel case property names are mapped to TF snake case attribute names.
+
+| CRD/OpenAPI type                                                | GO type              | TF attribyte type                                  |
+| --------------------------------------------------------------- | -------------------- | -------------------------------------------------- |
+| string                                                          | string               | schema.StringAttribute                             |
+| integer                                                         | int64                | schema.Int64Attribute                              |
+| number                                                          | float64              | schema.Float64Attribute                            |
+| boolean                                                         | boolean              | schema.BoolAttribute                               |
+| `object` with `AdditionalProperties` and `Schema.Type = object` | map[string]type      | schema.MapNestedAttribute                          |
+| `object` with `AdditionalProperties`                            | map[string]primitive | schema.MapAttribute                                |
+| `object` with Properties                                        | struct               | schema.SingleNestedAttribute                       |
+| array                                                           | []                   | schema.ListAttribute                               |
+
+Note: the field `additionalProperties` is mutually exclusive with `properties`.
+[OpenAPI Data Types](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.0.md#data-types)
+
+## Immutable fields
+OpenAPI schema doesn't support immutable fields. Kubernetes uses a [Common Expression Language (CEL)](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#transition-rules) extension to make fields immutable.
+To tell the generator that a property is immutable and needs TF attribute plan modifier `RequiresReplace` the prefix `(immutable)` must be added to the property description. E.g.:
+```yaml
+prefix:
+  type: string
+  description: "(immutable) The prefix to use for the bucket name"
+  x-kubernetes-validations:
+  - rule: self == oldSelf
+    message: Value is immutable
+```
+
+## Crossplane delete operation
+To properly handle the delete operation in Terraform, XRD [defaultCompositeDeletePolicy](https://docs.crossplane.io/v1.16/concepts/composite-resource-definitions/#defaultcompositedeletepolicy) should be set to `Foreground`. This causes Kubernetes to use foreground cascading deletion which deletes all child resources before deleting the parent resource. The claim controller waits for the composite deletion to finish before returning.
+
+## Well known Crossplane CRD properties
+Crossplane adds fields when it generates a CRD from XRD. The generator skips the next Crossplane-specific fields:
+in `Spec`:
+- compositeDeletePolicy
+- compositionRef
+- compositionRevisionRef
+- compositionRevisionSelector
+- compositionSelector
+- compositionUpdatePolicy
+- publishConnectionDetailsTo
+- resourceRef
+- writeConnectionSecretToRef
+
+in `Status`:
+- connectionDetails
+- in `conditions` we only need `type` and `status`
+
 ## Acknowledgements
 `tfpgen` is inspired by [terraform-provider-k8s](https://github.com/metio/terraform-provider-k8s)

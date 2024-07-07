@@ -6,7 +6,7 @@ Computed: {{ .Computed }},
 {{ if .Immutable }}PlanModifiers: []planmodifier.String{
 	{{ .Type }}planmodifier.RequiresReplace(),
 },{{ end }}
-{{- if .ElementType }}ElementType: {{ .ElementType }},{{ end }}
+{{ if .ElementType }}ElementType: {{ .ElementType }},{{ end }}
 {{ if eq .Type "struct" -}}
 	Attributes: map[string]schema.Attribute{
 	{{ range .Properties -}}
