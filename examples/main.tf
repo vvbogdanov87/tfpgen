@@ -35,8 +35,8 @@ resource "crd_bucket" "example" {
       "key1" = true
       "key2" = false
     }
-
-    mapobj = {
+    # test [map]object types
+    map_obj = {
       "key1" = {
         "objprop1" = "value1"
         "objprop2" = "value2"
@@ -46,12 +46,18 @@ resource "crd_bucket" "example" {
         "objprop2" = "value2"
       }
     }
-    strobj = {
+    # test object types
+    obj_str = {
       prop1 = "value1"
       prop2 = "value2"
     }
-    arrstr = ["value1", "value2"]
-    arrobj = [
+    # test primitive array types
+    arr_str = ["value1", "value2"]
+    arr_int = [1, 2]
+    arr_num = [1.1, 2.2]
+    arr_bool = [true, false]
+    # test array of object types
+    arr_obj = [
       {
         arrprop1 = "value1"
         arrprop2 = "value2"

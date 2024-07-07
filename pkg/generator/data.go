@@ -187,9 +187,25 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 				argumentType = "schema.ListNestedAttribute"
 				nestedProperties = crdProperties(sProp.Items.Schema, computed)
 			} else { // array of primitive
-				typeName = "[]" + sProp.Items.Schema.Type
 				argumentType = "schema.ListAttribute"
-				elementType = "types." + capitalizer.String(sProp.Items.Schema.Type) + "Type"
+
+				// TODO: remove code duplication with map[string]primitive above
+				typeName = "[]"
+				elementType = "types."
+				switch sProp.Items.Schema.Type {
+				case "string":
+					typeName += "string"
+					elementType += "StringType"
+				case "integer":
+					typeName += "int64"
+					elementType += "Int64Type"
+				case "number":
+					typeName += "float64"
+					elementType += "Float64Type"
+				case "boolean":
+					typeName += "bool"
+					elementType += "BoolType"
+				}
 			}
 		}
 		if computed {

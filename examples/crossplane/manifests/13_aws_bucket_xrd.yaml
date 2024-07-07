@@ -58,7 +58,8 @@ spec:
                 additionalProperties:
                   type: boolean
                 x-kubernetes-map-type: atomic
-              mapobj:
+              # test [map]object types
+              mapObj:
                 type: object
                 additionalProperties:
                   type: object
@@ -68,18 +69,33 @@ spec:
                     objprop2:
                       type: string
                 x-kubernetes-map-type: atomic
-              strobj:
+              # test object types
+              objStr:
                 type: object
                 properties:
                   prop1:
                     type: string
                   prop2:
                     type: string
-              arrstr:
+              # test primitive array types
+              arrStr:
                 type: array
                 items:
                   type: string
-              arrobj:
+              arrInt:
+                type: array
+                items:
+                  type: integer
+              arrNum:
+                type: array
+                items:
+                  type: number
+              arrBool:
+                type: array
+                items:
+                  type: boolean
+              # test array of object types
+              arrObj:
                 type: array
                 items:
                   type: object

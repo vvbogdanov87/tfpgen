@@ -53,10 +53,11 @@ CRD camel case property names are mapped to TF snake case attribute names.
 | integer                                                         | int64                | schema.Int64Attribute                              |
 | number                                                          | float64              | schema.Float64Attribute                            |
 | boolean                                                         | boolean              | schema.BoolAttribute                               |
-| `object` with `AdditionalProperties` and `Schema.Type = object` | map[string]type      | schema.MapNestedAttribute                          |
+| `object` with `AdditionalProperties` and `Schema.Type = object` | map[string]struct    | schema.MapNestedAttribute                          |
 | `object` with `AdditionalProperties`                            | map[string]primitive | schema.MapAttribute                                |
 | `object` with Properties                                        | struct               | schema.SingleNestedAttribute                       |
-| array                                                           | []                   | schema.ListAttribute                               |
+| array with `Schema.Type = object`                               | []struct             | schema.ListNestedAttribute                         |
+| array                                                           | []primitive          | schema.ListAttribute                               |
 
 Note: the field `additionalProperties` is mutually exclusive with `properties`.
 [OpenAPI Data Types](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.0.md#data-types)
@@ -92,6 +93,19 @@ in `Spec`:
 in `Status`:
 - connectionDetails
 - in `conditions` we only need `type` and `status`
+
+## Article
+
+- Why we need enterprise platforms
+    - Why we need an API layer
+- Why choose Kubernetes
+- Crossplane
+- terraform-provider-crd
+- Instead of Crossplane let's make our own controllers and CRDs combining kubebuilder or operator sdk with Pulumi Automation API
+- test performance and latency of Crossplane and controller-based solution
+- K8s sharding by namespace
+- versioning and upgrades
+- Global resources and regional resources
 
 ## Acknowledgements
 `tfpgen` is inspired by [terraform-provider-k8s](https://github.com/metio/terraform-provider-k8s)
