@@ -27,14 +27,15 @@ type Config struct {
 }
 
 func NewConfig(filename string) (*Config, error) {
-	f, err := os.Open(filename)
+	file, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filename, err)
 	}
-	defer f.Close()
+	defer file.Close()
 
-	bufr := bufio.NewReader(f)
+	bufr := bufio.NewReader(file)
 	yamlReader := yaml.NewYAMLReader(bufr)
+
 	data, err := yamlReader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read yaml from file %s: %w", filename, err)
@@ -61,6 +62,7 @@ func (c *Config) setDefaults(baseDir string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path: %w", err)
 		}
+
 		c.baseDir = baseDir
 	}
 

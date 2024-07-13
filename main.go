@@ -31,7 +31,7 @@ func main() {
 
 			generator := generator.NewGenerator(config)
 
-			err = generator.Generate(config)
+			err = generator.Generate()
 			if err != nil {
 				return fmt.Errorf("generate provider code: %w", err)
 			}

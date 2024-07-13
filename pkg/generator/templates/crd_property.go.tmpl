@@ -1,15 +1,15 @@
-{{ if eq .Type "struct" -}}
+{{ if eq .GoType "struct" -}}
 	{{ .FieldName }} *struct {
 	{{- range .Properties }}{{ template "crd_property.go.tmpl" . }}{{ end -}}
 	} `tfsdk:"{{ .TFName }}" json:"{{ .Name }}{{ if .Required }},omitempty{{ end }}"`
-{{ else if eq .Type "map" -}}
+{{ else if eq .GoType "map" -}}
 	{{ .FieldName }} map[string]struct {
 	{{- range .Properties }}{{ template "crd_property.go.tmpl" . }}{{ end -}}
 	} `tfsdk:"{{ .TFName }}" json:"{{ .Name }}{{ if .Required }},omitempty{{ end }}"`
-{{ else if eq .Type "array" -}}
+{{ else if eq .GoType "array" -}}
 	{{ .FieldName }} []struct {
 	{{- range .Properties }}{{ template "crd_property.go.tmpl" . }}{{ end -}}
 	} `tfsdk:"{{ .TFName }}" json:"{{ .Name }}{{ if .Required }},omitempty{{ end }}"`
 {{ else -}}
-{{ .FieldName }} {{ .Type }} `tfsdk:"{{ .TFName }}" json:"{{ .Name }}{{ if .Required }},omitempty{{ end }}"`
+{{ .FieldName }} {{ .GoType }} `tfsdk:"{{ .TFName }}" json:"{{ .Name }}{{ if .Required }},omitempty{{ end }}"`
 {{ end -}}

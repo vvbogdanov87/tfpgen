@@ -42,7 +42,7 @@ func NewGenerator(config *config.Config) *Generator {
 	}
 }
 
-func (g *Generator) Generate(config *config.Config) error {
+func (g *Generator) Generate() error {
 	packages, err := g.generateResources()
 	if err != nil {
 		return fmt.Errorf("generate resources: %w", err)
@@ -100,6 +100,7 @@ func (g *Generator) generateResources() ([]string, error) {
 		if err != nil {
 			return fmt.Errorf("parse schema: %w", err)
 		}
+
 		data.ModuleName = g.config.ModuleName
 
 		outDir := filepath.Join(g.config.OutputDir, "/internal/provider", data.PackageName)
@@ -243,7 +244,7 @@ func formatCode(filePath string) error {
 		return fmt.Errorf("format source %s: %w", filePath, err)
 	}
 
-	err = os.WriteFile(filePath, formatted, 0644)
+	err = os.WriteFile(filePath, formatted, 0o644)
 	if err != nil {
 		return fmt.Errorf("write formatted file %s: %w", filePath, err)
 	}

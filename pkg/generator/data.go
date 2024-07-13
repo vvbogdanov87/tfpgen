@@ -32,7 +32,7 @@ type Property struct {
 	TFName       string // Terraform argument name is snake case
 	Description  string
 	FieldName    string
-	Type         string
+	GoType       string
 	ArgumentType string
 	ElementType  string
 	Required     bool
@@ -53,23 +53,24 @@ func parseSchema(file string) (*Data, error) {
 	return crdToData(crd), nil
 }
 
-func loadSchema(file string) (*apiextensionsv1.CustomResourceDefinition, error) {
-	f, err := os.Open(file)
+func loadSchema(filename string) (*apiextensionsv1.CustomResourceDefinition, error) {
+	file, err := os.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %w", file, err)
+		return nil, fmt.Errorf("failed to open file %s: %w", filename, err)
 	}
-	defer f.Close()
+	defer file.Close()
 
-	bufr := bufio.NewReader(f)
+	bufr := bufio.NewReader(file)
 	yamlReader := yaml.NewYAMLReader(bufr)
+
 	data, err := yamlReader.Read()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read yaml from file %s: %w", file, err)
+		return nil, fmt.Errorf("failed to read yaml from file %s: %w", filename, err)
 	}
 
 	crd := &apiextensionsv1.CustomResourceDefinition{}
 	if err := yaml.Unmarshal(data, crd); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal yaml from file %s: %w", file, err)
+		return nil, fmt.Errorf("failed to unmarshal yaml from file %s: %w", filename, err)
 	}
 
 	return crd, nil
@@ -98,6 +99,7 @@ func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
 		"resourceRef",
 		"writeConnectionSecretToRef",
 	}
+
 	for _, field := range crossplaneSpecFields {
 		delete(spec.Properties, field)
 	}
@@ -108,6 +110,7 @@ func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
 		"connectionDetails",
 		"conditions",
 	}
+
 	for _, field := range crossplaneStatusFields {
 		delete(status.Properties, field)
 	}
@@ -118,7 +121,7 @@ func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
 		Resource:         crd.Spec.Names.Plural,
 		Version:          version.Name,
 		ResourceName:     resourceName,
-		PackageName:      strings.Replace(group, ".", "_", -1) + "_" + resourceName + "_" + strings.ToLower(version.Name),
+		PackageName:      strings.ReplaceAll(group, ".", "_") + "_" + resourceName + "_" + strings.ToLower(version.Name),
 		SpecProperties:   crdProperties(&spec, false),
 		StatusProperties: crdProperties(&status, true),
 	}
@@ -128,96 +131,27 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 	properties := make([]*Property, 0, len(schema.Properties))
 	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
-		// Compute types based on the schema type
-		var typeName string
-		// var tfTypeName string
-		var argumentType string
-		var elementType string
+		goType, argumentType, elementType := convertCrdType(sProp, computed)
 
 		var nestedProperties []*Property
 
-		switch sProp.Type {
-		case "string":
-			typeName = "string"
-			argumentType = "schema.StringAttribute"
-		case "integer":
-			typeName = "int64"
-			argumentType = "schema.Int64Attribute"
-		case "number":
-			typeName = "float64"
-			argumentType = "schema.Float64Attribute"
-		case "boolean":
-			typeName = "bool"
-			argumentType = "schema.BoolAttribute"
-		case "object":
-			// AdditionalProperties and Properties are mutually exclusive
-			if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
-				if sProp.AdditionalProperties.Schema.Type == "object" { // map[string]struct
-					typeName = "map"
-					argumentType = "schema.MapNestedAttribute"
-					nestedProperties = crdProperties(sProp.AdditionalProperties.Schema, computed)
-				} else { // map[string]primitive
-					argumentType = "schema.MapAttribute"
-
-					typeName = "map[string]"
-					elementType = "types."
-					switch sProp.AdditionalProperties.Schema.Type {
-					case "string":
-						typeName += "string"
-						elementType += "StringType"
-					case "integer":
-						typeName += "int64"
-						elementType += "Int64Type"
-					case "number":
-						typeName += "float64"
-						elementType += "Float64Type"
-					case "boolean":
-						typeName += "bool"
-						elementType += "BoolType"
-					}
-				}
-			} else if len(sProp.Properties) > 0 { // object with Properties is a struct
-				typeName = "struct"
-				argumentType = "schema.SingleNestedAttribute"
-				nestedProperties = crdProperties(&sProp, computed)
-			}
+		switch goType {
+		case "map":
+			nestedProperties = crdProperties(sProp.AdditionalProperties.Schema, computed)
+		case "struct":
+			nestedProperties = crdProperties(&sProp, computed)
 		case "array":
-			if sProp.Items.Schema.Type == "object" { // array of struct
-				typeName = "array"
-				argumentType = "schema.ListNestedAttribute"
-				nestedProperties = crdProperties(sProp.Items.Schema, computed)
-			} else { // array of primitive
-				argumentType = "schema.ListAttribute"
-
-				// TODO: remove code duplication with map[string]primitive above
-				typeName = "[]"
-				elementType = "types."
-				switch sProp.Items.Schema.Type {
-				case "string":
-					typeName += "string"
-					elementType += "StringType"
-				case "integer":
-					typeName += "int64"
-					elementType += "Int64Type"
-				case "number":
-					typeName += "float64"
-					elementType += "Float64Type"
-				case "boolean":
-					typeName += "bool"
-					elementType += "BoolType"
-				}
-			}
-		}
-		if computed {
-			typeName = "*" + typeName
+			nestedProperties = crdProperties(sProp.Items.Schema, computed)
 		}
 
 		description := sProp.Description
 		immutable := false
+
 		if strings.HasPrefix(description, "(immutable)") {
 			immutable = true
 			description = strings.TrimPrefix(description, "(immutable)")
 		}
+
 		description = strings.TrimSpace(description)
 
 		prop := &Property{
@@ -225,7 +159,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 			TFName:       toSnakeCase(name),
 			Description:  description,
 			FieldName:    capitalizer.String(name),
-			Type:         typeName,
+			GoType:       goType,
 			ArgumentType: argumentType,
 			ElementType:  elementType,
 			Computed:     computed,
@@ -256,11 +190,91 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 	return properties
 }
 
-var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
-var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+// convertCrdType converts a JSON schema type to a Go type and a Terraform argument type.
+func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, computed bool) (string, string, string) {
+	var (
+		goType       string
+		argumentType string
+		elementType  string
+	)
+
+	switch sProp.Type {
+	case "string":
+		goType = "string"
+		argumentType = "schema.StringAttribute"
+	case "integer":
+		goType = "int64"
+		argumentType = "schema.Int64Attribute"
+	case "number":
+		goType = "float64"
+		argumentType = "schema.Float64Attribute"
+	case "boolean":
+		goType = "bool"
+		argumentType = "schema.BoolAttribute"
+	case "object":
+		// AdditionalProperties and Properties are mutually exclusive
+		if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
+			if sProp.AdditionalProperties.Schema.Type == "object" { // map[string]struct
+				goType = "map"
+				argumentType = "schema.MapNestedAttribute"
+			} else { // map[string]primitive
+				argumentType = "schema.MapAttribute"
+				goType, elementType = getTfPrimitiveType(sProp.AdditionalProperties.Schema.Type)
+				goType = "map[string]" + goType
+			}
+		} else if len(sProp.Properties) > 0 { // object with Properties is a struct
+			goType = "struct"
+			argumentType = "schema.SingleNestedAttribute"
+		}
+	case "array":
+		if sProp.Items.Schema.Type == "object" { // array of struct
+			goType = "array"
+			argumentType = "schema.ListNestedAttribute"
+		} else { // array of primitive
+			argumentType = "schema.ListAttribute"
+			goType, elementType = getTfPrimitiveType(sProp.Items.Schema.Type)
+			goType = "[]" + goType
+		}
+	}
+
+	if computed {
+		goType = "*" + goType
+	}
+
+	return goType, argumentType, elementType
+}
+
+func getTfPrimitiveType(crdPrimitiveType string) (string, string) {
+	var tfType string
+
+	elementType := "types."
+
+	switch crdPrimitiveType {
+	case "string":
+		tfType = "string"
+		elementType += "StringType"
+	case "integer":
+		tfType = "int64"
+		elementType += "Int64Type"
+	case "number":
+		tfType = "float64"
+		elementType += "Float64Type"
+	case "boolean":
+		tfType = "bool"
+		elementType += "BoolType"
+	}
+
+	return tfType, elementType
+}
+
+var (
+	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
+)
 
 func toSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+
 	return strings.ToLower(snake)
 }

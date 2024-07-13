@@ -4,16 +4,16 @@ Optional: {{ .Optional }},
 Computed: {{ .Computed }},
 {{ if .Description }}Description: "{{ .Description }}",{{ end }}
 {{ if .Immutable }}PlanModifiers: []planmodifier.String{
-	{{ .Type }}planmodifier.RequiresReplace(),
+	{{ .GoType }}planmodifier.RequiresReplace(),
 },{{ end }}
 {{ if .ElementType }}ElementType: {{ .ElementType }},{{ end }}
-{{ if eq .Type "struct" -}}
+{{ if eq .GoType "struct" -}}
 	Attributes: map[string]schema.Attribute{
 	{{ range .Properties -}}
 		{{ template "schema_attribute.go.tmpl" . }}
 	{{ end -}}
 	},
-{{ else if eq .Type "map" -}}
+{{ else if eq .GoType "map" -}}
     NestedObject: schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 		{{ range .Properties -}}
@@ -21,7 +21,7 @@ Computed: {{ .Computed }},
 		{{ end -}}
 		},
 	},
-{{ else if eq .Type "array" -}}
+{{ else if eq .GoType "array" -}}
 	NestedObject: schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 		{{ range .Properties -}}
