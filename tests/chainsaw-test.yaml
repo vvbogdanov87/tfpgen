@@ -1,0 +1,138 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: test1
+spec:
+  concurrent: false
+  steps:
+  # Install Crossplane
+  - try:
+    - command:
+        entrypoint: helm
+        args:
+        - repo
+        - add
+        - crossplane-stable
+        - https://charts.crossplane.io/stable
+    - command:
+        entrypoint: helm
+        args:
+        - repo
+        - update
+    - command:
+        entrypoint: helm
+        args:
+        - install
+        - crossplane
+        - crossplane-stable/crossplane
+        - --namespace
+        - crossplane-system
+        - --create-namespace
+    - wait:
+        apiVersion: v1
+        kind: Pod
+        namespace: crossplane-system
+        selector: app=crossplane
+        timeout: 1m
+        for:
+          condition:
+            name: Ready
+            value: 'true'
+    cleanup:
+      - command:
+          entrypoint: helm
+          args:
+          - uninstall
+          - crossplane
+          - -n
+          - crossplane-system
+      - delete:
+          ref:
+            apiVersion: v1
+            kind: Namespace
+            name: crossplane-system
+  # Create a test namespace
+  - try:
+    - apply:
+        file: manifests/01_test_namespace.yaml
+  # Create a secret with AWS credentials for the provider
+  - try:
+    - command:
+        entrypoint: kubectl
+        args:
+        - create
+        - secret
+        - generic
+        - aws-secret
+        - -n
+        - crossplane-system
+        - --from-file=creds=/home/viktor/.aws/credentials
+  # Install Crossplane AWS Provider
+  - try:
+    - apply:
+        file: manifests/11_aws_provider.yaml
+    # Need to wait because the proder pods are created by crossplane and not directly by the manifest above
+    - sleep:
+        duration: 10s
+    - wait:
+        apiVersion: v1
+        kind: Pod
+        namespace: crossplane-system
+        selector: pkg.crossplane.io/provider=provider-family-aws
+        timeout: 1m
+        for:
+          condition:
+            name: Ready
+            value: 'true'
+    - sleep:
+        duration: 10s
+    - wait:
+        apiVersion: v1
+        kind: Pod
+        namespace: crossplane-system
+        selector: pkg.crossplane.io/provider=provider-aws-s3
+        timeout: 1m
+        for:
+          condition:
+            name: Ready
+            value: 'true'
+    - apply:
+        file: manifests/12_aws_provider_config.yaml
+  # Install the AWS S3 bucket XRD and composition
+  - try:
+    - apply:
+        file: manifests/13_aws_bucket_xrd.yaml
+    - apply:
+        file: manifests/14_aws_bucket_composition.yaml
+    - sleep:
+        duration: 10s
+  # Apply Terraform configuration
+  - try:
+    - script:
+        timeout: 5m
+        content: |
+          terraform apply -auto-approve
+    - wait:
+        apiVersion: prc.com/v1
+        kind: Bucket
+        name: testbckt
+        namespace: test
+        timeout: 1m
+        for:
+          condition:
+            name: Ready
+            value: 'true'
+  # Destroy Terraform configuration
+  - try:
+    - script:
+        timeout: 5m
+        content: |
+          terraform destroy -auto-approve
+    - wait:
+        apiVersion: prc.com/v1
+        kind: Bucket
+        name: testbckt
+        namespace: test
+        timeout: 1m
+        for:
+          deletion: {}
