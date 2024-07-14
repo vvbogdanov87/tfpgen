@@ -23,6 +23,6 @@ jobs:
       - uses: azure/setup-helm@v4.2.0
       - uses: kyverno/action-install-chainsaw@v0.1.0
       - uses: helm/kind-action@v1
-      - run: kind create cluster
       - name: Run tests
-        run: chainsaw test ./tests
+        working-directory: ./tests
+        run: chainsaw test
