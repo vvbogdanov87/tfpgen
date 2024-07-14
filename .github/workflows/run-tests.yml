@@ -26,5 +26,4 @@ jobs:
           release: v0.2.6
       - uses: helm/kind-action@v1
       - name: Run tests
-        working-directory: ./tests
-        run: chainsaw test
+        run: make test
