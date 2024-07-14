@@ -22,6 +22,8 @@ jobs:
           cp .terraformrc /home/runner/.terraformrc
       - uses: azure/setup-helm@v4.2.0
       - uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.6
       - uses: helm/kind-action@v1
       - name: Run tests
         working-directory: ./tests
