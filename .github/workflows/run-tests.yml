@@ -25,5 +25,4 @@ jobs:
       - uses: helm/kind-action@v1
       - run: kind create cluster
       - name: Run tests
-        run: make test
-      - run: kind delete cluster
+        run: chainsaw test ./tests
