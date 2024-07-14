@@ -55,55 +55,31 @@ spec:
   - try:
     - apply:
         file: manifests/01_test_namespace.yaml
-  # Create a secret with AWS credentials for the provider
-  - try:
-    - command:
-        entrypoint: kubectl
-        args:
-        - create
-        - secret
-        - generic
-        - aws-secret
-        - -n
-        - crossplane-system
-        - --from-file=creds=/home/viktor/.aws/credentials
-  # Install Crossplane AWS Provider
+  # Install Crossplane k8s Provider
   - try:
     - apply:
-        file: manifests/11_aws_provider.yaml
-    # Need to wait because the proder pods are created by crossplane and not directly by the manifest above
+        file: manifests/11_k8s_provider.yaml
+    # Need to wait because the provider pods are created by crossplane and not directly by the manifest above
     - sleep:
         duration: 10s
     - wait:
         apiVersion: v1
         kind: Pod
         namespace: crossplane-system
-        selector: pkg.crossplane.io/provider=provider-family-aws
-        timeout: 1m
-        for:
-          condition:
-            name: Ready
-            value: 'true'
-    - sleep:
-        duration: 10s
-    - wait:
-        apiVersion: v1
-        kind: Pod
-        namespace: crossplane-system
-        selector: pkg.crossplane.io/provider=provider-aws-s3
+        selector: pkg.crossplane.io/provider=provider-kubernetes
         timeout: 1m
         for:
           condition:
             name: Ready
             value: 'true'
     - apply:
-        file: manifests/12_aws_provider_config.yaml
-  # Install the AWS S3 bucket XRD and composition
+        file: manifests/12_k8s_provider_config.yaml
+  # Install the AWS S3 bucket XRD and k8s composition
   - try:
     - apply:
         file: manifests/13_aws_bucket_xrd.yaml
     - apply:
-        file: manifests/14_aws_bucket_composition.yaml
+        file: manifests/14_k8s_bucket_composition.yaml
     - sleep:
         duration: 10s
   # Apply Terraform configuration

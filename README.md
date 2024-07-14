@@ -94,18 +94,12 @@ in `Status`:
 - connectionDetails
 - in `conditions` we only need `type` and `status`
 
-## Article
-
-- Why we need enterprise platforms
-    - Why we need an API layer
-- Why choose Kubernetes
-- Crossplane
-- terraform-provider-crd
-- Instead of Crossplane let's make our own controllers and CRDs combining kubebuilder or operator sdk with Pulumi Automation API
-- test performance and latency of Crossplane and controller-based solution
-- K8s sharding by namespace
-- versioning and upgrades
-- Global resources and regional resources
+## Testing
+```shell
+kind create cluster
+make test
+kind delete cluster
+```
 
 ## Acknowledgements
 `tfpgen` is inspired by [terraform-provider-k8s](https://github.com/metio/terraform-provider-k8s)
