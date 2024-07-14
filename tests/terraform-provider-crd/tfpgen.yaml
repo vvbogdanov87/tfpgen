@@ -1,0 +1,5 @@
+name: "crd"
+address: "registry.terraform.io/vvbogdanov87/crd"
+moduleName: "github.com/vvbogdanov87/terraform-provider-crd"
+schemasDir: "schemas"
+outputDir: "."

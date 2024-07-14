@@ -1,0 +1,270 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: "2024-07-13T20:18:32Z"
+  generation: 1
+  name: buckets.prc.com
+  ownerReferences:
+  - apiVersion: apiextensions.crossplane.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: CompositeResourceDefinition
+    name: xbuckets.prc.com
+    uid: d8c54e18-8dd5-4679-afee-0b5d54387a84
+  resourceVersion: "943"
+  uid: 2899e3c7-3ec6-4eac-8aa3-3c238add287f
+spec:
+  conversion:
+    strategy: None
+  group: prc.com
+  names:
+    categories:
+    - claim
+    kind: Bucket
+    listKind: BucketList
+    plural: buckets
+    singular: bucket
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .spec.writeConnectionSecretToRef.name
+      name: CONNECTION-SECRET
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            properties:
+              name:
+                maxLength: 63
+                type: string
+            type: object
+          spec:
+            properties:
+              arrBool:
+                items:
+                  type: boolean
+                type: array
+              arrInt:
+                items:
+                  type: integer
+                type: array
+              arrNum:
+                items:
+                  type: number
+                type: array
+              arrObj:
+                items:
+                  properties:
+                    arrprop1:
+                      type: string
+                    arrprop2:
+                      type: string
+                  type: object
+                type: array
+              arrStr:
+                items:
+                  type: string
+                type: array
+              boolProp:
+                description: A boolean property
+                type: boolean
+              compositeDeletePolicy:
+                default: Foreground
+                enum:
+                - Background
+                - Foreground
+                type: string
+              compositionRef:
+                properties:
+                  name:
+                    type: string
+                required:
+                - name
+                type: object
+              compositionRevisionRef:
+                properties:
+                  name:
+                    type: string
+                required:
+                - name
+                type: object
+              compositionRevisionSelector:
+                properties:
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                required:
+                - matchLabels
+                type: object
+              compositionSelector:
+                properties:
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                required:
+                - matchLabels
+                type: object
+              compositionUpdatePolicy:
+                enum:
+                - Automatic
+                - Manual
+                type: string
+              intProp:
+                description: An integer property
+                type: integer
+              mapBool:
+                additionalProperties:
+                  type: boolean
+                type: object
+                x-kubernetes-map-type: atomic
+              mapInt:
+                additionalProperties:
+                  type: integer
+                type: object
+                x-kubernetes-map-type: atomic
+              mapNum:
+                additionalProperties:
+                  type: number
+                type: object
+                x-kubernetes-map-type: atomic
+              mapObj:
+                additionalProperties:
+                  properties:
+                    objprop1:
+                      type: string
+                    objprop2:
+                      type: string
+                  type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              mapStr:
+                additionalProperties:
+                  type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              numProp:
+                description: A number property
+                type: number
+              objStr:
+                properties:
+                  prop1:
+                    type: string
+                  prop2:
+                    type: string
+                type: object
+              prefix:
+                description: (immutable) The prefix to use for the bucket name
+                type: string
+                x-kubernetes-validations:
+                - rule: self == oldSelf
+              publishConnectionDetailsTo:
+                properties:
+                  configRef:
+                    default:
+                      name: default
+                    properties:
+                      name:
+                        type: string
+                    type: object
+                  metadata:
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      type:
+                        type: string
+                    type: object
+                  name:
+                    type: string
+                required:
+                - name
+                type: object
+              resourceRef:
+                properties:
+                  apiVersion:
+                    type: string
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                properties:
+                  name:
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - prefix
+            type: object
+          status:
+            properties:
+              arn:
+                description: ARN of the bucket
+                type: string
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              connectionDetails:
+                properties:
+                  lastPublishedTime:
+                    format: date-time
+                    type: string
+                type: object
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
