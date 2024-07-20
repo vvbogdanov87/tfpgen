@@ -1,0 +1,66 @@
+apiVersion: prc.com/v1
+kind: Bucket
+metadata:
+  name: testbckt
+  namespace: test
+spec:
+  arrBool:
+  - true
+  - false
+  arrInt:
+  - 1
+  - 2
+  arrNum:
+  - 1.1
+  - 2.2
+  arrObj:
+  - arrprop1: value1
+    arrprop2: value2
+  - arrprop1: value1
+    arrprop2: value2
+  arrStr:
+  - value1
+  - value2
+  boolProp: true
+  environmentConfigs:
+  - ref:
+      name: someRef
+    selector:
+      matchLabels:
+      - fromFieldPathPolicy: Required
+        type: Value
+        value: someValue
+      - fromFieldPathPolicy: Optional
+        type: Value
+        value: someValue2
+      maxMatch: 2
+      mode: Single
+      sortByFieldPath: metadata.name
+    type: Reference
+  intProp: 42
+  mapBool:
+    key1: true
+    key2: false
+  mapInt:
+    key1: 1
+    key2: 2
+  mapNum:
+    key1: 1.1
+    key2: 2.2
+  mapObj:
+    key1:
+      objprop1: value1
+      objprop2: value2
+    key2:
+      objprop1: value1
+      objprop2: value2
+  mapStr:
+    key1: value1
+    key2: value2
+  numProp: 3.14
+  objStr:
+    prop1: value1
+    prop2: value2
+  prefix: asd
+status:
+  arn: arn:aws:s3:::asd-prc-bucket

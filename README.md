@@ -95,9 +95,10 @@ in `Status`:
 - in `conditions` we only need `type` and `status`
 
 ## Testing
+Replace `/home/runner/go/bin` in `./tests/terraform-provider-crd/.terraformrc` with your absolute `go/bin` path. This is needed because `$HOME` interpolation does not work in the `provider_installation` block. Don't commit the change to the `.terraformrc` file.
 ```shell
 kind create cluster
-make test
+make test-local
 kind delete cluster
 ```
 

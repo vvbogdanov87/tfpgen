@@ -144,7 +144,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 			nestedProperties = crdProperties(sProp.Items.Schema, computed)
 		}
 
-		description := sProp.Description
+		description := description(sProp.Description)
 		immutable := false
 
 		if strings.HasPrefix(description, "(immutable)") {
@@ -270,11 +270,39 @@ func getTfPrimitiveType(crdPrimitiveType string) (string, string) {
 var (
 	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
 	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
+	matchDashes   = regexp.MustCompile("-")
+	matchDots     = regexp.MustCompile(`\.`)
+	matchSlashes  = regexp.MustCompile("/")
+	matchColons   = regexp.MustCompile(":")
 )
 
+// toSnakeCase converts a CamelCase string to snake_case.
+// From https://github.com/metio/terraform-provider-k8s/blob/faae52f524637d0778ff84c94930cd08eebf3a89/tools/internal/generator/converter.go#L166
 func toSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	snake = matchDashes.ReplaceAllString(snake, "_")
+	snake = matchDots.ReplaceAllString(snake, "_")
+	snake = matchSlashes.ReplaceAllString(snake, "_")
+	snake = matchColons.ReplaceAllString(snake, "_")
 
 	return strings.ToLower(snake)
+}
+
+var (
+	matchBackticks    = regexp.MustCompile(`\x60`)
+	matchDoubleQuotes = regexp.MustCompile("\"")
+	matchNewlines     = regexp.MustCompile("\n")
+	matchBackslashes  = regexp.MustCompile(`\\`)
+)
+
+// description cleans up the description field of a property.
+// From https://github.com/metio/terraform-provider-k8s/blob/faae52f524637d0778ff84c94930cd08eebf3a89/tools/internal/generator/converter.go#L337
+func description(description string) string {
+	clean := matchBackticks.ReplaceAllString(description, "'")
+	clean = matchDoubleQuotes.ReplaceAllString(clean, "'")
+	clean = matchNewlines.ReplaceAllString(clean, "")
+	clean = matchBackslashes.ReplaceAllString(clean, "")
+
+	return clean
 }
