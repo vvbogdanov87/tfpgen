@@ -28,4 +28,8 @@ go.work
 *.tfstate.*
 
 out/*
-tmp/*
+
+# generated test provider
+tests/terraform-provider-crd/go.mod
+tests/terraform-provider-crd/go.sum
+tests/terraform-provider-crd/**/*.go

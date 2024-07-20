@@ -5,29 +5,9 @@ metadata:
 spec:
   concurrent: false
   steps:
-  # Install Crossplane
-  - try:
+  - try: # Install Crossplane
     - command:
-        entrypoint: helm
-        args:
-        - repo
-        - add
-        - crossplane-stable
-        - https://charts.crossplane.io/stable
-    - command:
-        entrypoint: helm
-        args:
-        - repo
-        - update
-    - command:
-        entrypoint: helm
-        args:
-        - install
-        - crossplane
-        - crossplane-stable/crossplane
-        - --namespace
-        - crossplane-system
-        - --create-namespace
+        entrypoint: ./scripts/install_crossplane.sh
     - wait:
         apiVersion: v1
         kind: Pod
@@ -40,23 +20,16 @@ spec:
             value: 'true'
     cleanup:
       - command:
-          entrypoint: helm
-          args:
-          - uninstall
-          - crossplane
-          - -n
-          - crossplane-system
+          entrypoint: ./scripts/uninstall_crossplane.sh
       - delete:
           ref:
             apiVersion: v1
             kind: Namespace
             name: crossplane-system
-  # Create a test namespace
-  - try:
+  - try: # Create a test namespace
     - apply:
         file: manifests/01_test_namespace.yaml
-  # Install Crossplane k8s Provider
-  - try:
+  - try: # Install Crossplane k8s Provider
     - apply:
         file: manifests/11_k8s_provider.yaml
     # Need to wait because the provider pods are created by crossplane and not directly by the manifest above
@@ -74,16 +47,14 @@ spec:
             value: 'true'
     - apply:
         file: manifests/12_k8s_provider_config.yaml
-  # Install the AWS S3 bucket XRD and k8s composition
-  - try:
+  - try: # Install the AWS S3 bucket XRD and k8s composition
     - apply:
         file: manifests/13_aws_bucket_xrd.yaml
     - apply:
         file: manifests/14_k8s_bucket_composition.yaml
     - sleep:
         duration: 10s
-  # Apply Terraform configuration
-  - try:
+  - try: # Apply Terraform configuration
     - script:
         timeout: 5m
         content: |
@@ -98,8 +69,10 @@ spec:
           condition:
             name: Ready
             value: 'true'
-  # Destroy Terraform configuration
-  - try:
+  - try: # Test created bucket object
+    - assert:
+        file: asserts/bucket.yaml
+  - try: # Destroy Terraform configuration
     - script:
         timeout: 5m
         content: |
