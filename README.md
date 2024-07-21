@@ -47,17 +47,17 @@ This project aims to provide a Terraform provider for managing Custom Resource D
 ## CRD properties and TF attributes
 CRD camel case property names are mapped to TF snake case attribute names.
 
-| CRD/OpenAPI type                                                | GO type              | TF attribyte type                                  |
-| --------------------------------------------------------------- | -------------------- | -------------------------------------------------- |
-| string                                                          | string               | schema.StringAttribute                             |
-| integer                                                         | int64                | schema.Int64Attribute                              |
-| number                                                          | float64              | schema.Float64Attribute                            |
-| boolean                                                         | boolean              | schema.BoolAttribute                               |
-| `object` with `AdditionalProperties` and `Schema.Type = object` | map[string]struct    | schema.MapNestedAttribute                          |
-| `object` with `AdditionalProperties`                            | map[string]primitive | schema.MapAttribute                                |
-| `object` with Properties                                        | struct               | schema.SingleNestedAttribute                       |
-| array with `Schema.Type = object`                               | []struct             | schema.ListNestedAttribute                         |
-| array                                                           | []primitive          | schema.ListAttribute                               |
+| CRD/OpenAPI type                                                | GO type              | TF attribyte type                                  | Support OpenAPI Schema Object default field |
+| --------------------------------------------------------------- | -------------------- | -------------------------------------------------- | ------------------------------------------- |
+| string                                                          | string               | schema.StringAttribute                             | :white_check_mark:                          |
+| integer                                                         | int64                | schema.Int64Attribute                              | :x:                                         |
+| number                                                          | float64              | schema.Float64Attribute                            | :x:                                         |
+| boolean                                                         | boolean              | schema.BoolAttribute                               | :x:                                         |
+| `object` with `AdditionalProperties` and `Schema.Type = object` | map[string]struct    | schema.MapNestedAttribute                          | :x:                                         |
+| `object` with `AdditionalProperties`                            | map[string]primitive | schema.MapAttribute                                | :x:                                         |
+| `object` with Properties                                        | struct               | schema.SingleNestedAttribute                       | :x:                                         |
+| array with `Schema.Type = object`                               | []struct             | schema.ListNestedAttribute                         | :x:                                         |
+| array                                                           | []primitive          | schema.ListAttribute                               | :x:                                         |
 
 Note: the field `additionalProperties` is mutually exclusive with `properties`.
 [OpenAPI Data Types](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.0.md#data-types)
