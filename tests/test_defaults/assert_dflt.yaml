@@ -1,0 +1,15 @@
+apiVersion: prc.com/v1
+kind: Default
+metadata:
+  name: dflt
+  namespace: default
+spec:
+  prefix: asd
+  stringDefaultOne: ololo
+  stringDefaultTwo: two
+status:
+  arn: arn:aws:s3:::asd-prc-bucket
+  conditions:
+  - type: Synced
+    status: "True"
+  - type: Ready

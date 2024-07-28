@@ -5,11 +5,11 @@ metadata:
 spec:
   concurrent: false
   steps:
-  - try: # Install the AWS S3 bucket XRD and k8s composition
+  - try: # Install XRD and composition
     - apply:
-        file: 01_aws_bucket_xrd.yaml
+        file: 01_defaults_xrd.yaml
     - apply:
-        file: 02_k8s_bucket_composition.yaml
+        file: 02_defaults_composition.yaml
     - sleep:
         duration: 10s
   - try: # Apply Terraform configuration
@@ -17,9 +17,9 @@ spec:
         timeout: 1m
         content: |
           terraform apply -auto-approve
-  - try: # Test created bucket object
+  - try: # Test created object
     - assert:
-        file: assert_bucket.yaml
+        file: assert_dflt.yaml
   - try: # Destroy Terraform configuration
     - script:
         timeout: 2m
@@ -27,8 +27,8 @@ spec:
           terraform destroy -auto-approve
     - wait:
         apiVersion: prc.com/v1
-        kind: Bucket
-        name: testbckt
+        kind: Default
+        name: dflt
         namespace: default
         timeout: 1m
         for:
