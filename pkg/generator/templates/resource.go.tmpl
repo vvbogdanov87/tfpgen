@@ -17,6 +17,15 @@ import (
 	{{ if .AdditionalImports.DefaultsString -}}
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	{{ end -}}
+	{{ if .AdditionalImports.DefaultsInt64 -}}
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	{{ end -}}
+	{{ if .AdditionalImports.DefaultsFloat64 -}}
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/float64default"
+	{{ end -}}
+	{{ if .AdditionalImports.DefaultsBool -}}
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	{{ end -}}
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"{{ .ModuleName }}/internal/provider/common"
@@ -152,7 +161,7 @@ func (r *tfResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	_, err = r.client.
-		Resource(k8sSchema.GroupVersionResource{Group: "{{ .Group }}", Version: "{{ .Version }}", Resource: "buckets"}).
+		Resource(k8sSchema.GroupVersionResource{Group: "{{ .Group }}", Version: "{{ .Version }}", Resource: "{{ .Resource }}"}).
 		Namespace(r.namespace).
 		Patch(ctx, plan.Name.ValueString(), k8sTypes.ApplyPatchType, body, patchOptions)
 	if err != nil {

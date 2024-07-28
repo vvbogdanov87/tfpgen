@@ -180,6 +180,15 @@ spec:
                             if nil.
                           format: int64
                           type: integer
+                        minMatch:
+                          type: integer
+                          default: 2
+                        boolWithDefault:
+                          type: boolean
+                          default: true
+                        float64WithDefault:
+                          type: number
+                          default: 3.14
                         mode:
                           default: Single
                           description: 'Mode specifies retrieval strategy: "Single"

@@ -147,6 +147,12 @@ spec:
                     selector:
                       description: Selector selects EnvironmentConfig(s) via labels.
                       properties:
+                        boolWithDefault:
+                          default: true
+                          type: boolean
+                        float64WithDefault:
+                          default: 3.14
+                          type: number
                         matchLabels:
                           description: MatchLabels ensures an object with matching
                             labels is selected.
@@ -188,6 +194,9 @@ spec:
                           description: MaxMatch specifies the number of extracted
                             EnvironmentConfigs in Multiple mode, extracts all if nil.
                           format: int64
+                          type: integer
+                        minMatch:
+                          default: 2
                           type: integer
                         mode:
                           default: Single

@@ -67,6 +67,7 @@ resource "crd_bucket" "example" {
         arrprop2 = "value2"
       }
     ]
+    # test complex structure
     environment_configs = [
       {
         ref = {

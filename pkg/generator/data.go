@@ -47,7 +47,10 @@ type Property struct {
 }
 
 type AdditionalImports struct {
-	DefaultsString bool
+	DefaultsString  bool
+	DefaultsInt64   bool
+	DefaultsFloat64 bool
+	DefaultsBool    bool
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -166,6 +169,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 		case "array":
 			nestedProperties, err = crdProperties(sProp.Items.Schema, additionalImports, computed)
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to get nested CRD properties: %w", err)
 		}
@@ -188,7 +192,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 			GoType:       goType,
 			ArgumentType: argumentType,
 			ElementType:  elementType,
-			Computed:     computed,
+			Computed:     computed || dflt != "",
 			Immutable:    immutable,
 			Default:      dflt,
 			Properties:   nestedProperties,
@@ -234,20 +238,51 @@ func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *Ad
 		if sProp.Default != nil {
 			var s string
 			if err := json.Unmarshal(sProp.Default.Raw, &s); err != nil {
-				return "", "", "", "", err
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default string: %w", err)
 			}
+
 			dflt = fmt.Sprintf("stringdefault.StaticString(\"%s\")", s)
 			additionalImports.DefaultsString = true
 		}
 	case "integer":
 		goType = "int64"
 		argumentType = "schema.Int64Attribute"
+
+		if sProp.Default != nil {
+			var i int64
+			if err := json.Unmarshal(sProp.Default.Raw, &i); err != nil {
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default int64: %w", err)
+			}
+
+			dflt = fmt.Sprintf("int64default.StaticInt64(%d)", i)
+			additionalImports.DefaultsInt64 = true
+		}
 	case "number":
 		goType = "float64"
 		argumentType = "schema.Float64Attribute"
+
+		if sProp.Default != nil {
+			var f float64
+			if err := json.Unmarshal(sProp.Default.Raw, &f); err != nil {
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default float64: %w", err)
+			}
+
+			dflt = fmt.Sprintf("float64default.StaticFloat64(%g)", f)
+			additionalImports.DefaultsFloat64 = true
+		}
 	case "boolean":
 		goType = "bool"
 		argumentType = "schema.BoolAttribute"
+
+		if sProp.Default != nil {
+			var b bool
+			if err := json.Unmarshal(sProp.Default.Raw, &b); err != nil {
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default bool: %w", err)
+			}
+
+			dflt = fmt.Sprintf("booldefault.StaticBool(%t)", b)
+			additionalImports.DefaultsBool = true
+		}
 	case "object":
 		// AdditionalProperties and Properties are mutually exclusive
 		if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
