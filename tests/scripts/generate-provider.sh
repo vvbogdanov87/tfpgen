@@ -2,7 +2,7 @@
 
 d=$(dirname "$0")
 
-cd ${d}/../tests/terraform-provider-crd
+cd ${d}/../terraform-provider-crd
 
 go mod init github.com/vvbogdanov87/terraform-provider-crd
 tfpgen

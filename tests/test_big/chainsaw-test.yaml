@@ -1,0 +1,35 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: test1
+spec:
+  concurrent: false
+  steps:
+  - try: # Install the AWS S3 bucket XRD and k8s composition
+    - apply:
+        file: 01_aws_bucket_xrd.yaml
+    - apply:
+        file: 02_k8s_bucket_composition.yaml
+    - sleep:
+        duration: 10s
+  - try: # Apply Terraform configuration
+    - script:
+        timeout: 1m
+        content: |
+          terraform apply -auto-approve
+  - try: # Test created bucket object
+    - assert:
+        file: assert_bucket.yaml
+  - try: # Destroy Terraform configuration
+    - script:
+        timeout: 2m
+        content: |
+          terraform destroy -auto-approve
+    - wait:
+        apiVersion: prc.com/v1
+        kind: Bucket
+        name: testbckt
+        namespace: test
+        timeout: 1m
+        for:
+          deletion: {}

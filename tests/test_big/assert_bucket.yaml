@@ -2,7 +2,7 @@ apiVersion: prc.com/v1
 kind: Bucket
 metadata:
   name: testbckt
-  namespace: test
+  namespace: default
 spec:
   arrBool:
   - true
@@ -64,3 +64,8 @@ spec:
   prefix: asd
 status:
   arn: arn:aws:s3:::asd-prc-bucket
+  conditions:
+  - type: Synced
+    status: "True"
+  - type: Ready
+    status: "True"

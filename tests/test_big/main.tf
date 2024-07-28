@@ -7,10 +7,17 @@ terraform {
 }
 
 provider "crd" {
-  namespace = "test"
+  namespace = "default"
 }
 
 resource "crd_bucket" "example" {
+  timeouts = {
+    create = "1m"
+    update = "3m"
+    delete = "2m"
+    read   = "1m"
+  }
+
   name = "testbckt"
   spec = {
     # test primitive types
