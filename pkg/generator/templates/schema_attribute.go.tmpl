@@ -3,6 +3,7 @@ Required: {{ .Required }},
 Optional: {{ .Optional }},
 Computed: {{ .Computed }},
 {{ if .Description }}Description: "{{ .Description }}",{{ end }}
+{{ if .Default }}Default: {{ .Default }},{{ end }}
 {{ if .Immutable }}PlanModifiers: []planmodifier.String{
 	{{ .GoType }}planmodifier.RequiresReplace(),
 },{{ end }}

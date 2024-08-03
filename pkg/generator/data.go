@@ -2,6 +2,7 @@ package generator
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -16,15 +17,16 @@ import (
 )
 
 type Data struct {
-	Group            string
-	Version          string
-	Resource         string
-	Kind             string
-	ResourceName     string
-	PackageName      string
-	ModuleName       string
-	SpecProperties   []*Property
-	StatusProperties []*Property
+	Group             string
+	Version           string
+	Resource          string
+	Kind              string
+	ResourceName      string
+	PackageName       string
+	ModuleName        string
+	AdditionalImports AdditionalImports
+	SpecProperties    []*Property
+	StatusProperties  []*Property
 }
 
 type Property struct {
@@ -39,7 +41,16 @@ type Property struct {
 	Optional     bool
 	Computed     bool
 	Immutable    bool
-	Properties   []*Property
+	Default      string
+
+	Properties []*Property
+}
+
+type AdditionalImports struct {
+	DefaultsString  bool
+	DefaultsInt64   bool
+	DefaultsFloat64 bool
+	DefaultsBool    bool
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -50,7 +61,7 @@ func parseSchema(file string) (*Data, error) {
 		return nil, fmt.Errorf("failed to load schema: %w", err)
 	}
 
-	return crdToData(crd), nil
+	return crdToData(crd)
 }
 
 func loadSchema(filename string) (*apiextensionsv1.CustomResourceDefinition, error) {
@@ -76,7 +87,7 @@ func loadSchema(filename string) (*apiextensionsv1.CustomResourceDefinition, err
 	return crd, nil
 }
 
-func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
+func crdToData(crd *apiextensionsv1.CustomResourceDefinition) (*Data, error) {
 	group := crd.Spec.Group
 	kind := crd.Spec.Names.Kind
 	resourceName := strings.ToLower(kind)
@@ -115,33 +126,52 @@ func crdToData(crd *apiextensionsv1.CustomResourceDefinition) *Data {
 		delete(status.Properties, field)
 	}
 
-	return &Data{
-		Kind:             kind,
-		Group:            group,
-		Resource:         crd.Spec.Names.Plural,
-		Version:          version.Name,
-		ResourceName:     resourceName,
-		PackageName:      strings.ReplaceAll(group, ".", "_") + "_" + resourceName + "_" + strings.ToLower(version.Name),
-		SpecProperties:   crdProperties(&spec, false),
-		StatusProperties: crdProperties(&status, true),
+	var additionalImports AdditionalImports
+
+	specProperties, err := crdProperties(&spec, &additionalImports, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get spec properties: %w", err)
 	}
+	statusProperties, err := crdProperties(&status, &additionalImports, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status properties: %w", err)
+	}
+
+	return &Data{
+		Kind:              kind,
+		Group:             group,
+		Resource:          crd.Spec.Names.Plural,
+		Version:           version.Name,
+		ResourceName:      resourceName,
+		PackageName:       strings.ReplaceAll(group, ".", "_") + "_" + resourceName + "_" + strings.ToLower(version.Name),
+		AdditionalImports: additionalImports,
+		SpecProperties:    specProperties,
+		StatusProperties:  statusProperties,
+	}, nil
 }
 
-func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Property {
+func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) ([]*Property, error) {
 	properties := make([]*Property, 0, len(schema.Properties))
 	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
-		goType, argumentType, elementType := convertCrdType(sProp, computed)
+		goType, argumentType, elementType, dflt, err := convertCrdType(sProp, additionalImports, computed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert CRD type: %w", err)
+		}
 
 		var nestedProperties []*Property
 
 		switch goType {
 		case "map":
-			nestedProperties = crdProperties(sProp.AdditionalProperties.Schema, computed)
+			nestedProperties, err = crdProperties(sProp.AdditionalProperties.Schema, additionalImports, computed)
 		case "struct":
-			nestedProperties = crdProperties(&sProp, computed)
+			nestedProperties, err = crdProperties(&sProp, additionalImports, computed)
 		case "array":
-			nestedProperties = crdProperties(sProp.Items.Schema, computed)
+			nestedProperties, err = crdProperties(sProp.Items.Schema, additionalImports, computed)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get nested CRD properties: %w", err)
 		}
 
 		description := description(sProp.Description)
@@ -162,8 +192,9 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 			GoType:       goType,
 			ArgumentType: argumentType,
 			ElementType:  elementType,
-			Computed:     computed,
+			Computed:     computed || dflt != "",
 			Immutable:    immutable,
+			Default:      dflt,
 			Properties:   nestedProperties,
 		}
 
@@ -187,30 +218,71 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, computed bool) []*Pr
 		return properties[i].Name < properties[j].Name
 	})
 
-	return properties
+	return properties, nil
 }
 
 // convertCrdType converts a JSON schema type to a Go type and a Terraform argument type.
-func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, computed bool) (string, string, string) {
+func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) (string, string, string, string, error) {
 	var (
 		goType       string
 		argumentType string
 		elementType  string
+		dflt         string
 	)
 
 	switch sProp.Type {
 	case "string":
 		goType = "string"
 		argumentType = "schema.StringAttribute"
+
+		if sProp.Default != nil {
+			var s string
+			if err := json.Unmarshal(sProp.Default.Raw, &s); err != nil {
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default string: %w", err)
+			}
+
+			dflt = fmt.Sprintf("stringdefault.StaticString(\"%s\")", s)
+			additionalImports.DefaultsString = true
+		}
 	case "integer":
 		goType = "int64"
 		argumentType = "schema.Int64Attribute"
+
+		if sProp.Default != nil {
+			var i int64
+			if err := json.Unmarshal(sProp.Default.Raw, &i); err != nil {
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default int64: %w", err)
+			}
+
+			dflt = fmt.Sprintf("int64default.StaticInt64(%d)", i)
+			additionalImports.DefaultsInt64 = true
+		}
 	case "number":
 		goType = "float64"
 		argumentType = "schema.Float64Attribute"
+
+		if sProp.Default != nil {
+			var f float64
+			if err := json.Unmarshal(sProp.Default.Raw, &f); err != nil {
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default float64: %w", err)
+			}
+
+			dflt = fmt.Sprintf("float64default.StaticFloat64(%g)", f)
+			additionalImports.DefaultsFloat64 = true
+		}
 	case "boolean":
 		goType = "bool"
 		argumentType = "schema.BoolAttribute"
+
+		if sProp.Default != nil {
+			var b bool
+			if err := json.Unmarshal(sProp.Default.Raw, &b); err != nil {
+				return "", "", "", "", fmt.Errorf("failed to unmarshal default bool: %w", err)
+			}
+
+			dflt = fmt.Sprintf("booldefault.StaticBool(%t)", b)
+			additionalImports.DefaultsBool = true
+		}
 	case "object":
 		// AdditionalProperties and Properties are mutually exclusive
 		if sProp.AdditionalProperties != nil { // object with AdditionalProperties is a map
@@ -241,7 +313,7 @@ func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, computed bool) (strin
 		goType = "*" + goType
 	}
 
-	return goType, argumentType, elementType
+	return goType, argumentType, elementType, dflt, nil
 }
 
 func getTfPrimitiveType(crdPrimitiveType string) (string, string) {

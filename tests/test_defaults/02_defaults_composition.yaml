@@ -1,11 +1,11 @@
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: buckets
+  name: defaults
 spec:
   compositeTypeRef:
     apiVersion: prc.com/v1
-    kind: XBucket
+    kind: XDefault
   resources:
     - name: bucket
       base:
@@ -19,7 +19,7 @@ spec:
               apiVersion: v1
               kind: ConfigMap
               metadata:
-                namespace: test
+                namespace: default
           managementPolicies:
             - Observe
             - Create

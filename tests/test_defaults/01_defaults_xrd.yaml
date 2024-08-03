@@ -1,0 +1,65 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xdefaults.prc.com
+spec:
+  group: prc.com
+  names:
+    kind: XDefault
+    plural: xdefaults
+  claimNames:
+    kind: Default
+    plural: defaults
+  defaultCompositeDeletePolicy: Foreground
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              prefix:
+                type: string
+                description: "(immutable) The prefix to use for the bucket name"
+                x-kubernetes-validations:
+                - rule: self == oldSelf
+              # test string default values
+              stringDefaultOne:
+                type: string
+                default: "one"
+              stringDefaultTwo:
+                type: string
+                default: "two"
+              # test integer default values
+              intDefaultOne:
+                type: integer
+                default: 1
+              intDefaultTwo:
+                type: integer
+                default: 2
+              # test number default values
+              numDefaultOne:
+                type: number
+                default: 1.0
+              numDefaultTwo:
+                type: number
+                default: 2.0
+              # test boolean default values
+              boolDefaultOne:
+                type: boolean
+                default: true
+              boolDefaultTwo:
+                type: boolean
+                default: true
+            required:
+              - prefix
+          status:
+            type: object
+            properties:
+              arn:
+                type: string
+                description: "ARN of the bucket"

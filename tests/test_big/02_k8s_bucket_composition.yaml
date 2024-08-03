@@ -1,0 +1,49 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: buckets
+spec:
+  compositeTypeRef:
+    apiVersion: prc.com/v1
+    kind: XBucket
+  resources:
+    - name: bucket
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        metadata:
+          name: bucket
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                namespace: default
+          managementPolicies:
+            - Observe
+            - Create
+            - Update
+            - Delete
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.prefix
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-prc-bucket"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.prefix
+          toFieldPath: spec.forProvider.manifest.data.arn
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "arn:aws:s3:::%s-prc-bucket"
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.manifest.data.arn
+          toFieldPath: status.arn
