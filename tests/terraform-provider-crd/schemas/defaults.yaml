@@ -138,6 +138,24 @@ spec:
               stringDefaultTwo:
                 default: two
                 type: string
+              intDefaultOne:
+                type: integer
+                default: 1
+              intDefaultTwo:
+                type: integer
+                default: 2
+              numDefaultOne:
+                type: number
+                default: 1.0
+              numDefaultTwo:
+                type: number
+                default: 2.0
+              boolDefaultOne:
+                type: boolean
+                default: true
+              boolDefaultTwo:
+                type: boolean
+                default: true
               writeConnectionSecretToRef:
                 properties:
                   name:

@@ -7,6 +7,12 @@ spec:
   prefix: asd
   stringDefaultOne: ololo
   stringDefaultTwo: two
+  intDefaultOne: 42
+  intDefaultTwo: 2
+  numDefaultOne: 3.14
+  numDefaultTwo: 2.0
+  boolDefaultOne: false
+  boolDefaultTwo: true
 status:
   arn: arn:aws:s3:::asd-prc-bucket
   conditions:

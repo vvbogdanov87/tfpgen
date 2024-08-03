@@ -50,9 +50,9 @@ CRD camel case property names are mapped to TF snake case attribute names.
 | CRD/OpenAPI type                                                | GO type              | TF attribyte type                                  | Support OpenAPI Schema Object default field |
 | --------------------------------------------------------------- | -------------------- | -------------------------------------------------- | ------------------------------------------- |
 | string                                                          | string               | schema.StringAttribute                             | :white_check_mark:                          |
-| integer                                                         | int64                | schema.Int64Attribute                              | :x:                                         |
-| number                                                          | float64              | schema.Float64Attribute                            | :x:                                         |
-| boolean                                                         | boolean              | schema.BoolAttribute                               | :x:                                         |
+| integer                                                         | int64                | schema.Int64Attribute                              | :white_check_mark:                          |
+| number                                                          | float64              | schema.Float64Attribute                            | :white_check_mark:                          |
+| boolean                                                         | boolean              | schema.BoolAttribute                               | :white_check_mark:                          |
 | `object` with `AdditionalProperties` and `Schema.Type = object` | map[string]struct    | schema.MapNestedAttribute                          | :x:                                         |
 | `object` with `AdditionalProperties`                            | map[string]primitive | schema.MapAttribute                                | :x:                                         |
 | `object` with Properties                                        | struct               | schema.SingleNestedAttribute                       | :x:                                         |

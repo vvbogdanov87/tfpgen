@@ -23,6 +23,9 @@ resource "crd_default" "example" {
     prefix    = "asd"
 
     string_default_one = "ololo"
+    int_default_one    = 42
+    num_default_one    = 3.14
+    bool_default_one   = false
   }
 }
 

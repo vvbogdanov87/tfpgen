@@ -34,6 +34,27 @@ spec:
               stringDefaultTwo:
                 type: string
                 default: "two"
+              # test integer default values
+              intDefaultOne:
+                type: integer
+                default: 1
+              intDefaultTwo:
+                type: integer
+                default: 2
+              # test number default values
+              numDefaultOne:
+                type: number
+                default: 1.0
+              numDefaultTwo:
+                type: number
+                default: 2.0
+              # test boolean default values
+              boolDefaultOne:
+                type: boolean
+                default: true
+              boolDefaultTwo:
+                type: boolean
+                default: true
             required:
               - prefix
           status:
