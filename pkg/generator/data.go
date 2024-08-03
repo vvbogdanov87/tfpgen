@@ -30,18 +30,20 @@ type Data struct {
 }
 
 type Property struct {
-	Name         string
-	TFName       string // Terraform argument name is snake case
-	Description  string
-	FieldName    string
-	GoType       string
-	ArgumentType string
-	ElementType  string
-	Required     bool
-	Optional     bool
-	Computed     bool
-	Immutable    bool
-	Default      string
+	Name           string
+	TFName         string // Terraform argument name is snake case
+	Description    string
+	FieldName      string
+	GoType         string
+	ArgumentType   string
+	ElementType    string
+	Required       bool
+	Optional       bool
+	Computed       bool
+	Immutable      bool
+	Default        string
+	ValidatorsType string
+	Validators     []string
 
 	Properties []*Property
 }
@@ -51,6 +53,10 @@ type AdditionalImports struct {
 	DefaultsInt64   bool
 	DefaultsFloat64 bool
 	DefaultsBool    bool
+
+	ValidatorString  bool
+	ValidatorInt64   bool
+	ValidatorFloat64 bool
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -159,6 +165,8 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 			return nil, fmt.Errorf("failed to convert CRD type: %w", err)
 		}
 
+		validatorsType, validators := getValidators(sProp, additionalImports)
+
 		var nestedProperties []*Property
 
 		switch goType {
@@ -185,17 +193,20 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 		description = strings.TrimSpace(description)
 
 		prop := &Property{
-			Name:         name,
-			TFName:       toSnakeCase(name),
-			Description:  description,
-			FieldName:    capitalizer.String(name),
-			GoType:       goType,
-			ArgumentType: argumentType,
-			ElementType:  elementType,
-			Computed:     computed || dflt != "",
-			Immutable:    immutable,
-			Default:      dflt,
-			Properties:   nestedProperties,
+			Name:           name,
+			TFName:         toSnakeCase(name),
+			Description:    description,
+			FieldName:      capitalizer.String(name),
+			GoType:         goType,
+			ArgumentType:   argumentType,
+			ElementType:    elementType,
+			Computed:       computed || dflt != "",
+			Immutable:      immutable,
+			Default:        dflt,
+			ValidatorsType: validatorsType,
+			Validators:     validators,
+
+			Properties: nestedProperties,
 		}
 
 		properties = append(properties, prop)
@@ -337,6 +348,39 @@ func getTfPrimitiveType(crdPrimitiveType string) (string, string) {
 	}
 
 	return tfType, elementType
+}
+
+func getValidators(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, []string) {
+	var (
+		validatorsType string
+		validators     []string
+	)
+
+	switch sProp.Type {
+	case "string":
+		validatorsType = "validator.String"
+
+		// validator for string enums
+		if len(sProp.Enum) > 0 {
+			additionalImports.ValidatorString = true
+
+			var enums []string
+
+			for _, enum := range sProp.Enum {
+				if str := string(enum.Raw); str != "" {
+					enums = append(enums, str)
+				}
+			}
+
+			validators = append(validators, fmt.Sprintf("stringvalidator.OneOf(%s)", strings.Join(enums, ", ")))
+		}
+	case "integer":
+		validatorsType = "validator.Int64"
+	case "number":
+		validatorsType = "validator.Float64"
+	}
+
+	return validatorsType, validators
 }
 
 var (

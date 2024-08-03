@@ -1,0 +1,42 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xenums.prc.com
+spec:
+  group: prc.com
+  names:
+    kind: XEnum
+    plural: xenums
+  claimNames:
+    kind: Enum
+    plural: enums
+  defaultCompositeDeletePolicy: Foreground
+  versions:
+  - name: v1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              prefix:
+                type: string
+                description: "(immutable) The prefix to use for the bucket name"
+                x-kubernetes-validations:
+                - rule: self == oldSelf
+              strProp:
+                type: string
+                enum:
+                - Optional
+                - Required
+            required:
+              - prefix
+          status:
+            type: object
+            properties:
+              arn:
+                type: string
+                description: "ARN of the bucket"
