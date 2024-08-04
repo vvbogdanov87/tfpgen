@@ -2,7 +2,6 @@ package generator
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -160,12 +159,10 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 	properties := make([]*Property, 0, len(schema.Properties))
 	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
-		goType, argumentType, elementType, dflt, err := convertCrdType(sProp, additionalImports, computed)
+		goType, argumentType, elementType, dflt, validatorsType, validators, err := convertCrdType(sProp, additionalImports, computed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert CRD type: %w", err)
 		}
-
-		validatorsType, validators := getValidators(sProp, additionalImports)
 
 		var nestedProperties []*Property
 
@@ -233,66 +230,42 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 }
 
 // convertCrdType converts a JSON schema type to a Go type and a Terraform argument type.
-func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) (string, string, string, string, error) {
-	var (
-		goType       string
-		argumentType string
-		elementType  string
-		dflt         string
-	)
-
+func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) (goType, argumentType, elementType, dflt, validatorsType string, validators []string, err error) {
 	switch sProp.Type {
 	case "string":
 		goType = "string"
 		argumentType = "schema.StringAttribute"
 
-		if sProp.Default != nil {
-			var s string
-			if err := json.Unmarshal(sProp.Default.Raw, &s); err != nil {
-				return "", "", "", "", fmt.Errorf("failed to unmarshal default string: %w", err)
-			}
+		validatorsType = "validator.String"
+		validators = getStringValidators(sProp, additionalImports)
 
-			dflt = fmt.Sprintf("stringdefault.StaticString(\"%s\")", s)
-			additionalImports.DefaultsString = true
+		dflt, err = getStringDefault(sProp, additionalImports)
+		if err != nil {
+			return goType, argumentType, elementType, dflt, validatorsType, nil, err
 		}
 	case "integer":
 		goType = "int64"
 		argumentType = "schema.Int64Attribute"
 
-		if sProp.Default != nil {
-			var i int64
-			if err := json.Unmarshal(sProp.Default.Raw, &i); err != nil {
-				return "", "", "", "", fmt.Errorf("failed to unmarshal default int64: %w", err)
-			}
-
-			dflt = fmt.Sprintf("int64default.StaticInt64(%d)", i)
-			additionalImports.DefaultsInt64 = true
+		dflt, err = getIntegerDefault(sProp, additionalImports)
+		if err != nil {
+			return goType, argumentType, elementType, dflt, validatorsType, nil, err
 		}
 	case "number":
 		goType = "float64"
 		argumentType = "schema.Float64Attribute"
 
-		if sProp.Default != nil {
-			var f float64
-			if err := json.Unmarshal(sProp.Default.Raw, &f); err != nil {
-				return "", "", "", "", fmt.Errorf("failed to unmarshal default float64: %w", err)
-			}
-
-			dflt = fmt.Sprintf("float64default.StaticFloat64(%g)", f)
-			additionalImports.DefaultsFloat64 = true
+		dflt, err = getNumberDefault(sProp, additionalImports)
+		if err != nil {
+			return goType, argumentType, elementType, dflt, validatorsType, nil, err
 		}
 	case "boolean":
 		goType = "bool"
 		argumentType = "schema.BoolAttribute"
 
-		if sProp.Default != nil {
-			var b bool
-			if err := json.Unmarshal(sProp.Default.Raw, &b); err != nil {
-				return "", "", "", "", fmt.Errorf("failed to unmarshal default bool: %w", err)
-			}
-
-			dflt = fmt.Sprintf("booldefault.StaticBool(%t)", b)
-			additionalImports.DefaultsBool = true
+		dflt, err = getBooleanDefault(sProp, additionalImports)
+		if err != nil {
+			return goType, argumentType, elementType, dflt, validatorsType, nil, err
 		}
 	case "object":
 		// AdditionalProperties and Properties are mutually exclusive
@@ -324,7 +297,7 @@ func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *Ad
 		goType = "*" + goType
 	}
 
-	return goType, argumentType, elementType, dflt, nil
+	return goType, argumentType, elementType, dflt, validatorsType, validators, nil
 }
 
 func getTfPrimitiveType(crdPrimitiveType string) (string, string) {
@@ -348,39 +321,6 @@ func getTfPrimitiveType(crdPrimitiveType string) (string, string) {
 	}
 
 	return tfType, elementType
-}
-
-func getValidators(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, []string) {
-	var (
-		validatorsType string
-		validators     []string
-	)
-
-	switch sProp.Type {
-	case "string":
-		validatorsType = "validator.String"
-
-		// validator for string enums
-		if len(sProp.Enum) > 0 {
-			additionalImports.ValidatorString = true
-
-			var enums []string
-
-			for _, enum := range sProp.Enum {
-				if str := string(enum.Raw); str != "" {
-					enums = append(enums, str)
-				}
-			}
-
-			validators = append(validators, fmt.Sprintf("stringvalidator.OneOf(%s)", strings.Join(enums, ", ")))
-		}
-	case "integer":
-		validatorsType = "validator.Int64"
-	case "number":
-		validatorsType = "validator.Float64"
-	}
-
-	return validatorsType, validators
 }
 
 var (
