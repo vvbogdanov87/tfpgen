@@ -26,6 +26,20 @@ import (
 	{{ if .AdditionalImports.DefaultsBool -}}
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	{{ end -}}
+	{{ if .AdditionalImports.ValidatorString -}}
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	{{ end -}}
+	{{ if .AdditionalImports.ValidatorInt64 -}}
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	{{ end -}}
+	{{ if .AdditionalImports.ValidatorFloat64 -}}
+	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
+	{{ end -}}
+
+	{{ if or .AdditionalImports.ValidatorString .AdditionalImports.ValidatorInt64 .AdditionalImports.ValidatorFloat64 -}}
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	{{ end -}}
+
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"{{ .ModuleName }}/internal/provider/common"

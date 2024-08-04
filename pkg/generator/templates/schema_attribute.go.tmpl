@@ -7,6 +7,13 @@ Computed: {{ .Computed }},
 {{ if .Immutable }}PlanModifiers: []planmodifier.String{
 	{{ .GoType }}planmodifier.RequiresReplace(),
 },{{ end }}
+{{ if gt (len .Validators) 0 -}}
+Validators: []{{ .ValidatorsType }}{
+	{{ range $index, $validator := .Validators -}}
+	{{ $validator }},
+	{{ end }}
+},
+{{ end -}}
 {{ if .ElementType }}ElementType: {{ .ElementType }},{{ end }}
 {{ if eq .GoType "struct" -}}
 	Attributes: map[string]schema.Attribute{
