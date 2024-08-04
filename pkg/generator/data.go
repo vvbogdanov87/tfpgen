@@ -159,7 +159,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 	properties := make([]*Property, 0, len(schema.Properties))
 	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
-		goType, argumentType, elementType, dflt, validatorsType, validators, err := convertCrdType(sProp, additionalImports, computed)
+		goType, argumentType, elementType, dflt, validatorsType, validators, err := convertCrdType(&sProp, additionalImports, computed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert CRD type: %w", err)
 		}
@@ -230,7 +230,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 }
 
 // convertCrdType converts a JSON schema type to a Go type and a Terraform argument type.
-func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) (goType, argumentType, elementType, dflt, validatorsType string, validators []string, err error) {
+func convertCrdType(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) (goType, argumentType, elementType, dflt, validatorsType string, validators []string, err error) {
 	switch sProp.Type {
 	case "string":
 		goType = "string"
@@ -247,6 +247,9 @@ func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *Ad
 		goType = "int64"
 		argumentType = "schema.Int64Attribute"
 
+		validatorsType = "validator.Int64"
+		validators = getIntegerValidators(sProp, additionalImports)
+
 		dflt, err = getIntegerDefault(sProp, additionalImports)
 		if err != nil {
 			return goType, argumentType, elementType, dflt, validatorsType, nil, err
@@ -254,6 +257,9 @@ func convertCrdType(sProp apiextensionsv1.JSONSchemaProps, additionalImports *Ad
 	case "number":
 		goType = "float64"
 		argumentType = "schema.Float64Attribute"
+
+		validatorsType = "validator.Float64"
+		validators = getNumberValidators(sProp, additionalImports)
 
 		dflt, err = getNumberDefault(sProp, additionalImports)
 		if err != nil {

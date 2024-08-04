@@ -7,7 +7,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
-func getStringDefault(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
+func getStringDefault(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
 	if sProp.Default == nil {
 		return "", nil
 	}
@@ -22,7 +22,7 @@ func getStringDefault(sProp apiextensionsv1.JSONSchemaProps, additionalImports *
 	return fmt.Sprintf("stringdefault.StaticString(\"%s\")", str), nil
 }
 
-func getIntegerDefault(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
+func getIntegerDefault(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
 	if sProp.Default == nil {
 		return "", nil
 	}
@@ -37,7 +37,7 @@ func getIntegerDefault(sProp apiextensionsv1.JSONSchemaProps, additionalImports 
 	return fmt.Sprintf("int64default.StaticInt64(%d)", integer), nil
 }
 
-func getNumberDefault(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
+func getNumberDefault(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
 	if sProp.Default == nil {
 		return "", nil
 	}
@@ -52,7 +52,7 @@ func getNumberDefault(sProp apiextensionsv1.JSONSchemaProps, additionalImports *
 	return fmt.Sprintf("float64default.StaticFloat64(%f)", number), nil
 }
 
-func getBooleanDefault(sProp apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
+func getBooleanDefault(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports) (string, error) {
 	if sProp.Default == nil {
 		return "", nil
 	}
