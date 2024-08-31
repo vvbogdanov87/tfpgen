@@ -29,20 +29,21 @@ type Data struct {
 }
 
 type Property struct {
-	Name           string
-	TFName         string // Terraform argument name is snake case
-	Description    string
-	FieldName      string
-	GoType         string
-	ArgumentType   string
-	ElementType    string
-	Required       bool
-	Optional       bool
-	Computed       bool
-	Immutable      bool
-	Default        string
-	ValidatorsType string
-	Validators     []string
+	Name              string
+	TFName            string // Terraform argument name is snake case
+	Description       string
+	FieldName         string
+	GoType            string
+	ArgumentType      string
+	ElementType       string
+	Required          bool
+	Optional          bool
+	Computed          bool
+	Default           string
+	ValidatorsType    string
+	Validators        []string
+	PlanModifiersType string
+	PlanModifiers     []string
 
 	Properties []*Property
 }
@@ -56,6 +57,12 @@ type AdditionalImports struct {
 	ValidatorString  bool
 	ValidatorInt64   bool
 	ValidatorFloat64 bool
+
+	PlanModifier        bool
+	PlanModifierString  bool
+	PlanModifierInt64   bool
+	PlanModifierFloat64 bool
+	PlanModifierBool    bool
 }
 
 var capitalizer = cases.Title(language.English, cases.NoLower)
@@ -159,7 +166,7 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 	properties := make([]*Property, 0, len(schema.Properties))
 	// Iterate over the properties of the schema. Recursively call crdProperties.
 	for name, sProp := range schema.Properties {
-		goType, argumentType, elementType, dflt, validatorsType, validators, err := convertCrdType(&sProp, additionalImports, computed)
+		goType, argumentType, elementType, dflt, validatorsType, validators, planModifiersType, planModifiers, description, err := convertCrdType(&sProp, additionalImports, computed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert CRD type: %w", err)
 		}
@@ -179,29 +186,20 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 			return nil, fmt.Errorf("failed to get nested CRD properties: %w", err)
 		}
 
-		description := description(sProp.Description)
-		immutable := false
-
-		if strings.HasPrefix(description, "(immutable)") {
-			immutable = true
-			description = strings.TrimPrefix(description, "(immutable)")
-		}
-
-		description = strings.TrimSpace(description)
-
 		prop := &Property{
-			Name:           name,
-			TFName:         toSnakeCase(name),
-			Description:    description,
-			FieldName:      capitalizer.String(name),
-			GoType:         goType,
-			ArgumentType:   argumentType,
-			ElementType:    elementType,
-			Computed:       computed || dflt != "",
-			Immutable:      immutable,
-			Default:        dflt,
-			ValidatorsType: validatorsType,
-			Validators:     validators,
+			Name:              name,
+			TFName:            toSnakeCase(name),
+			Description:       description,
+			FieldName:         capitalizer.String(name),
+			GoType:            goType,
+			ArgumentType:      argumentType,
+			ElementType:       elementType,
+			Computed:          computed || dflt != "",
+			Default:           dflt,
+			ValidatorsType:    validatorsType,
+			Validators:        validators,
+			PlanModifiersType: planModifiersType,
+			PlanModifiers:     planModifiers,
 
 			Properties: nestedProperties,
 		}
@@ -230,7 +228,17 @@ func crdProperties(schema *apiextensionsv1.JSONSchemaProps, additionalImports *A
 }
 
 // convertCrdType converts a JSON schema type to a Go type and a Terraform argument type.
-func convertCrdType(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) (goType, argumentType, elementType, dflt, validatorsType string, validators []string, err error) {
+func convertCrdType(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *AdditionalImports, computed bool) (goType, argumentType, elementType, dflt, validatorsType string, validators []string, planModifiersType string, planModifiers []string, description string, err error) {
+	description = cleanDescription(sProp.Description)
+
+	immutable := false
+	if strings.HasPrefix(description, "(immutable)") {
+		immutable = true
+		description = strings.TrimPrefix(description, "(immutable)")
+	}
+
+	description = strings.TrimSpace(description)
+
 	switch sProp.Type {
 	case "string":
 		goType = "string"
@@ -239,9 +247,16 @@ func convertCrdType(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *A
 		validatorsType = "validator.String"
 		validators = getStringValidators(sProp, additionalImports)
 
+		planModifiersType = "planmodifier.String"
+		if immutable {
+			planModifiers = append(planModifiers, "stringplanmodifier.RequiresReplace()")
+			additionalImports.PlanModifier = true
+			additionalImports.PlanModifierString = true
+		}
+
 		dflt, err = getStringDefault(sProp, additionalImports)
 		if err != nil {
-			return goType, argumentType, elementType, dflt, validatorsType, nil, err
+			return
 		}
 	case "integer":
 		goType = "int64"
@@ -250,9 +265,16 @@ func convertCrdType(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *A
 		validatorsType = "validator.Int64"
 		validators = getIntegerValidators(sProp, additionalImports)
 
+		planModifiersType = "planmodifier.Int64"
+		if immutable {
+			planModifiers = append(planModifiers, "int64planmodifier.RequiresReplace()")
+			additionalImports.PlanModifier = true
+			additionalImports.PlanModifierInt64 = true
+		}
+
 		dflt, err = getIntegerDefault(sProp, additionalImports)
 		if err != nil {
-			return goType, argumentType, elementType, dflt, validatorsType, nil, err
+			return
 		}
 	case "number":
 		goType = "float64"
@@ -261,17 +283,31 @@ func convertCrdType(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *A
 		validatorsType = "validator.Float64"
 		validators = getNumberValidators(sProp, additionalImports)
 
+		planModifiersType = "planmodifier.Float64"
+		if immutable {
+			planModifiers = append(planModifiers, "float64planmodifier.RequiresReplace()")
+			additionalImports.PlanModifier = true
+			additionalImports.PlanModifierFloat64 = true
+		}
+
 		dflt, err = getNumberDefault(sProp, additionalImports)
 		if err != nil {
-			return goType, argumentType, elementType, dflt, validatorsType, nil, err
+			return
 		}
 	case "boolean":
 		goType = "bool"
 		argumentType = "schema.BoolAttribute"
 
+		planModifiersType = "planmodifier.Bool"
+		if immutable {
+			planModifiers = append(planModifiers, "boolplanmodifier.RequiresReplace()")
+			additionalImports.PlanModifier = true
+			additionalImports.PlanModifierBool = true
+		}
+
 		dflt, err = getBooleanDefault(sProp, additionalImports)
 		if err != nil {
-			return goType, argumentType, elementType, dflt, validatorsType, nil, err
+			return
 		}
 	case "object":
 		// AdditionalProperties and Properties are mutually exclusive
@@ -303,7 +339,7 @@ func convertCrdType(sProp *apiextensionsv1.JSONSchemaProps, additionalImports *A
 		goType = "*" + goType
 	}
 
-	return goType, argumentType, elementType, dflt, validatorsType, validators, nil
+	return
 }
 
 func getTfPrimitiveType(crdPrimitiveType string) (string, string) {
@@ -358,9 +394,9 @@ var (
 	matchBackslashes  = regexp.MustCompile(`\\`)
 )
 
-// description cleans up the description field of a property.
+// cleanDescription cleans up the description field of a property.
 // From https://github.com/metio/terraform-provider-k8s/blob/faae52f524637d0778ff84c94930cd08eebf3a89/tools/internal/generator/converter.go#L337
-func description(description string) string {
+func cleanDescription(description string) string {
 	clean := matchBackticks.ReplaceAllString(description, "'")
 	clean = matchDoubleQuotes.ReplaceAllString(clean, "'")
 	clean = matchNewlines.ReplaceAllString(clean, "")

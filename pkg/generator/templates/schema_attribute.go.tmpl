@@ -4,8 +4,10 @@ Optional: {{ .Optional }},
 Computed: {{ .Computed }},
 {{ if .Description }}Description: "{{ .Description }}",{{ end }}
 {{ if .Default }}Default: {{ .Default }},{{ end }}
-{{ if .Immutable }}PlanModifiers: []planmodifier.String{
-	{{ .GoType }}planmodifier.RequiresReplace(),
+{{ if .PlanModifiers }}PlanModifiers: []{{ .PlanModifiersType }}{
+	{{ range $index, $planModifier := .PlanModifiers -}}
+	{{ $planModifier }},
+	{{ end }}
 },{{ end }}
 {{ if gt (len .Validators) 0 -}}
 Validators: []{{ .ValidatorsType }}{
